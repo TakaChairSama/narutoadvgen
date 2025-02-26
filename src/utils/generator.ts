@@ -255,6 +255,16 @@ function calculateModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+function calculateMaxHp(cr: number, conMod: number): number {
+  const baseHP = Array(cr).fill(0).map(() => rollDice(12)).reduce((a, b) => a + b, 0);
+  return baseHP + (conMod * cr) + 10 + conMod; // Adjust as per your HP calculation logic
+}
+
+function calculateMaxChakra(cr: number, conMod: number): number {
+  const baseChakra = Array(cr).fill(0).map(() => rollDice(12)).reduce((a, b) => a + b, 0);
+  return baseChakra + (conMod * cr) + 10 + conMod; // Adjust as per your Chakra calculation logic
+}
+
 function generateWeapon(cr: number): Weapon {
   // Select base weapon
   const baseWeapon =
