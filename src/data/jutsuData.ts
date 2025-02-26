@@ -1516,6 +1516,414 @@ export const BASIC_JUTSU: Jutsu[] = [
         'On a failed save, they take 10d8 force damage'
       ]
     },
+
+  {
+  name: 'Cinder Spray',
+  rank: 'D',
+  chakraCost: 3,
+  description: 'Expels a cone of superheated cinders that burn and disorient',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '15-foot cone',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Fire',
+  effects: [
+    'Creatures in area take 5d6 fire damage',
+    'Targets must succeed Constitution save or be blinded for 1 round'
+  ]
+},
+{
+  name: 'Smoldering Trap',
+  rank: 'D',
+  chakraCost: 4,
+  description: 'Plants delayed explosive seals that ignite when triggered',
+  components: ['HS', 'SM'],
+  castingTime: '1 Minute',
+  range: 'Touch',
+  duration: '8 hours',
+  keywords: ['Ninjutsu'],
+  nature: 'Fire',
+  effects: [
+    'Place up to 3 invisible thermal seals',
+    'Triggers when creature moves within 5ft',
+    'Deals 6d4 fire damage in 10ft radius'
+  ]
+},
+{
+  name: 'Pyroclastic Flow',
+  rank: 'C',
+  chakraCost: 7,
+  description: 'Creates a fast-moving cloud of superheated ash and rock fragments',
+  components: ['HS', 'CM', 'SM'],
+  castingTime: '1 Action',
+  range: '60-foot line',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Fire',
+  effects: [
+    '20ft wide line of burning particulates',
+    '8d6 fire + 3d6 bludgeoning damage',
+    'Extinguishes non-magical flames in area'
+  ]
+},
+{
+  name: 'Flare Surge',
+  rank: 'C',
+  chakraCost: 6,
+  description: 'Generates waves of thermal energy that radiate outward',
+  components: ['HS', 'CM'],
+  castingTime: '1 Bonus Action',
+  range: 'Self (30ft radius)',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Fire',
+  effects: [
+    'Pushes enemies 10ft back on failed Strength save',
+    'Deals 4d8 fire damage to those contacting solid objects'
+  ]
+},
+{
+  name: 'Inferno Pillar',
+  rank: 'B',
+  chakraCost: 9,
+  description: 'Summons rotating columns of fire that scour an area',
+  components: ['HS', 'CM', 'SM'],
+  castingTime: '1 Action',
+  range: '90 feet',
+  duration: 'Concentration, up to 1 minute',
+  keywords: ['Ninjutsu'],
+  nature: 'Fire',
+  effects: [
+    'Creates 3 10ft-diameter pillars in 60ft cube',
+    '6d8 fire damage/round to creatures within 10ft',
+    'Dexterity save for half damage each turn'
+  ]
+},
+{
+  name: 'Dew Drop Needles',
+  rank: 'D',
+  chakraCost: 3,
+  description: 'Fires high-pressure water droplets that pierce armor',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Water',
+  effects: [
+    'Ranged spell attack against single target',
+    '5d6 piercing damage on hit',
+    'Ignores non-magical armor bonuses'
+  ]
+},
+{
+  name: 'Mist Veil',
+  rank: 'D',
+  chakraCost: 2,
+  description: 'Generates thick fog that carries subtle water chakra',
+  components: ['HS'],
+  castingTime: '1 Action',
+  range: 'Self (30ft radius )',
+  duration: 'Concentration, up to 10 minutes',
+  keywords: ['Ninjutsu'],
+  nature: 'Water',
+  effects: [
+    'Grants advantage on Stealth checks while in the mist',
+    'Creatures have disadvantage on attack rolls against you'
+  ]
+},
+{
+  name: 'Hydrostatic Press',
+  rank: 'C',
+  chakraCost: 6,
+  description: 'Unleashes a powerful jet of water that crushes foes',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '30 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Water',
+  effects: [
+    'Creatures in a 10-foot radius must make a Strength saving throw',
+    'Take 8d6 bludgeoning damage on failed save, half on success'
+  ]
+},
+{
+  name: 'Torrential Vortex',
+  rank: 'C',
+  chakraCost: 8,
+  description: 'Creates a swirling vortex of water that pulls enemies in',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Concentration, up to 1 minute',
+  keywords: ['Ninjutsu'],
+  nature: 'Water',
+  effects: [
+    'Creatures within 15 feet must make a Strength saving throw',
+    'On a failed save, they are pulled 10 feet towards the center and take 4d8 bludgeoning damage'
+  ]
+},
+{
+  name: 'Abyssal Crush',
+  rank: 'B',
+  chakraCost: 10,
+  description: 'Summons a massive wave of water that crashes down on foes',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Water',
+  effects: [
+    'Creatures in a 30-foot radius must make a Dexterity saving throw',
+    'Take 10d8 bludgeoning damage on failed save, half on success'
+  ]
+},
+  {
+  name: 'Earthen Grasp',
+  rank: 'D',
+  chakraCost: 3,
+  description: 'Summons hands of earth to restrain enemies',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '30 feet',
+  duration: 'Concentration, up to 1 minute',
+  keywords: ['Ninjutsu'],
+  nature: 'Earth',
+  effects: [
+    'Target must succeed on a Strength saving throw or be restrained',
+    'While restrained, the target takes 2d6 bludgeoning damage at the start of each of its turns'
+  ]
+},
+{
+  name: 'Sand Blast',
+  rank: 'D',
+  chakraCost: 4,
+  description: 'Fires a projectile of compressed sand at a target',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Earth',
+  effects: [
+    'Ranged spell attack against a target',
+    '5d6 piercing damage on hit'
+  ]
+},
+{
+  name: 'Bedrock Bulwark',
+  rank: 'C',
+  chakraCost: 6,
+  description: 'Raises a wall of stone to protect against attacks',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: 'Self',
+  duration: 'Concentration, up to 10 minutes',
+  keywords: ['Ninjutsu'],
+  nature: 'Earth',
+  effects: [
+    'Creates a wall with 20 hit points',
+    'Absorbs damage until destroyed'
+  ]
+},
+{
+  name: 'Seismic Pulse',
+  rank: 'C',
+  chakraCost: 8,
+  description: 'Sends a shockwave through the ground to knock enemies off balance',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Earth',
+  effects: [
+    'Creatures in a 20-foot radius must make a Dexterity saving throw',
+    'Take 6d8 bludgeoning damage on failed save, half on success'
+  ]
+},
+{
+  name: 'Tectonic Shift',
+  rank: 'B',
+  chakraCost: 9,
+  description: 'Alters the battlefield by creating fissures in the ground',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Instant',
+  keywords: ['Ninj utsu'],
+  nature: 'Earth',
+  effects: [
+    'Create a 30-foot radius fissure that deals 8d6 bludgeoning damage',
+    'Creatures must make a Strength saving throw or be knocked prone'
+  ]
+},
+  {
+  name: 'Zephyr\'s Kiss',
+  rank: 'D',
+  chakraCost: 3,
+  description: 'A gentle breeze that can push small objects or creatures',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '30 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Wind',
+  effects: [
+    'Target must make a Strength saving throw or be pushed back 10 feet',
+    'If pushed, the target takes 2d4 slashing damage'
+  ]
+},
+{
+  name: 'Wind Slicer',
+  rank: 'D',
+  chakraCost: 4,
+  description: 'Creates a blade of wind that cuts through enemies',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Wind',
+  effects: [
+    'Ranged spell attack against a target',
+    '5d6 slashing damage on hit'
+  ]
+},
+{
+  name: 'Aerial Current',
+  rank: 'C',
+  chakraCost: 6,
+  description: 'Manipulates wind currents to hinder movement',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: 'Self (30-foot radius)',
+  duration: 'Concentration, up to 1 minute',
+  keywords: ['Ninjutsu'],
+  nature: 'Wind',
+  effects: [
+    'Creatures in the area must make a Strength saving throw or have their movement speed halved',
+    'While affected, they take 2d6 slashing damage at the start of their turns'
+  ]
+},
+{
+  name: 'Gale Force Push',
+  rank: 'C',
+  chakraCost: 8,
+  description: 'Unleashes a powerful gust of wind that knocks back foes',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Wind',
+  effects: [
+    'Creatures in a 15-foot cone must make a Strength saving throw',
+    'Take 6d8 slashing damage on failed save, half on success'
+  ]
+},
+{
+  name: 'Skyrend Slash',
+  rank: 'B',
+  chakraCost: 10,
+  description: 'Creates a massive wind slash that devastates the area',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '120 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Wind',
+  effects: [
+    'Deal 10d8 slashing damage in a 30-foot line',
+    'Creatures must make a Dexterity saving throw, taking half damage on success'
+  ]
+},
+  {
+  name: 'Static Cling',
+  rank: 'D',
+  chakraCost: 3,
+  description: 'Creates a static charge that slows down enemies',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '30 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Lightning',
+  effects: [
+    'Target must make a Dexterity saving throw or have their speed reduced by half until the end of their next turn',
+    'If they fail, they take 3d4 lightning damage'
+  ]
+},
+{
+  name: 'Voltaic Flash',
+  rank: 'D',
+  chakraCost: 4,
+  description: 'Unleashes a blinding flash of lightning',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: 'Self (30-foot radius)',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Lightning',
+  effects: [
+    'Creatures in the area must make a Constitution saving throw',
+    'On a failed save, they are blinded until the end of their next turn and take 4d6 lightning damage'
+  ]
+},
+{
+  name: 'Ionized Beam',
+  rank: 'C',
+  chakraCost: 6,
+  description: 'Fires a concentrated beam of lightning at a target',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Lightning',
+  effects: [
+    'Ranged spell attack against a target',
+    '8d6 lightning damage on hit',
+    'Target must succeed on a Constitution saving throw or be stunned until the end of their next turn'
+  ]
+},
+{
+  name: 'Thunderous Roar',
+  rank: 'C',
+  chakraCost: 7,
+  description: 'Creates a deafening clap of thunder that disorients foes',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '60 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Lightning',
+  effects: [
+    'Creatures in a 20-foot radius must make a Constitution saving throw',
+    'Take 6d8 thunder damage on failed save, half on success',
+    'Targets are deafened until the end of their next turn'
+  ]
+},
+{
+  name: 'Plasma Whip',
+  rank: 'B',
+  chakraCost: 9,
+  description: 'Summons a whip of pure lightning that lashes out at foes',
+  components: ['HS', 'CM'],
+  castingTime: '1 Action',
+  range: '30 feet',
+  duration: 'Instant',
+  keywords: ['Ninjutsu'],
+  nature: 'Lightning',
+  effects: [
+    'Make a melee spell attack against a target',
+    'On a hit, deal 10d6 lightning damage and pull the target 10 feet closer to you'
+  ]
+},
+  
     {
       name: 'Temporal Shift',
       rank: 'B',
