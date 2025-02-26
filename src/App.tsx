@@ -146,6 +146,31 @@ function App() {
     }
   };
 
+  const handleLevelUp = () => {
+  if (!character) return;
+
+  // Determine new CR and rank
+  const newCR = character.cr + 1; // Increment CR for simplicity
+  const newRank = NINJA_RANKS[Math.min(NINJA_RANKS.indexOf(character.rank) + 1, NINJA_RANKS.length - 1)];
+
+  // Update character stats and abilities
+  const updatedCharacter = {
+    ...character,
+    cr: newCR,
+    rank: newRank,
+    xp: XP_BY_CR[newCR], // Update XP based on new CR
+    stats: generateStats(newCR), // Re-generate stats
+    maxHp: calculateMaxHp(newCR, character.modifiers.con), // Recalculate max HP
+    maxChakra: calculateMaxChakra(newCR, character.modifiers.con), // Recalculate max Chakra
+    jutsu: getClanJutsu(character.clan, newRank).concat(getJutsu(newRank, character.specialty, character.chakraNatures)), // Get new jutsu
+    abilities: getClanFeatures(character.clan, Math.floor((newCR + 1) / 2)), // Get new clan features
+  };
+
+  setCharacter(updatedCharacter);
+  setCurrentHp(updatedCharacter.maxHp); // Reset current HP to max
+  setCurrentChakra(updatedCharacter.maxChakra); // Reset current Chakra to max
+};
+
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-red-700 text-white py-6 shadow-lg">
