@@ -82,6 +82,9 @@ function App() {
   const [selectedSpecialty, setSelectedSpecialty] = useState<NinjaSpecialty>('Ninjutsu');
   const [currentHp, setCurrentHp] = useState<number>(0);
   const [currentChakra, setCurrentChakra] = useState<number>(0);
+  
+  const [exportedCharacter, setExportedCharacter] = useState<string>('');
+  const [importedCharacter, setImportedCharacter] = useState<string>('');
 
   const handleNatureToggle = (nature: ChakraNature) => {
     if (selectedNatures.includes(nature)) {
@@ -125,6 +128,24 @@ function App() {
     setCharacter(newCharacter);
   };
 
+  const handleExport = () => {
+    if (character) {
+      const serialized = serializeCharacter(character);
+      setExportedCharacter(serialized);
+    }
+  };
+
+  const handleImport = () => {
+    const deserialized = deserializeCharacter(importedCharacter);
+    if (deserialized) {
+      setCharacter(deserialized);
+      setCurrentHp(deserialized.hp);
+      setCurrentChakra(deserialized.chakra);
+    } else {
+      alert("Invalid character data.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-red-700 text-white py-6 shadow-lg">
@@ -141,7 +162,7 @@ function App() {
           {/* Generator Controls */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <User className="w-5 h-5 mr-2" />
+              <User  className="w-5 h-5 mr-2" />
               Character Options
             </h2>
             
@@ -339,6 +360,39 @@ function App() {
               </div>
             </div>
           )}
+
+          {/* Import/Export Character Section */}
+          <div className="bg-white rounded-lg shadow-md p-6 mt-8">
+            <h2 className="text-xl font-semibold mb-4">Import/Export Character</h2>
+            <div className="space-y-4">
+              <button
+                onClick={handleExport}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+              >
+                Export Character
+              </button>
+              <textarea
+                value={exportedCharacter}
+                readOnly
+                rows={5}
+                className="w-full border-gray-300 rounded-md p-2"
+                placeholder="Exported character data will appear here..."
+              />
+              <textarea
+                value={importedCharacter}
+                onChange={(e) => setImportedCharacter(e.target.value)}
+                rows={5}
+                className="w-full border-gray-300 rounded-md p-2"
+                placeholder="Paste character data here to import..."
+              />
+              <button
+                onClick={handleImport}
+                className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+              >
+                Import Character
+              </button>
+            </div>
+          </div>
         </div>
       </main>
     </div>
