@@ -296,6 +296,13 @@ function App() {
                 Character Sheet
               </h2>
 
+              <button
+  onClick={handleLevelUp}
+  className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+>
+  Level Up
+</button>
+
               <div className="space-y-4">
                 <div className="border-b pb-4">
                   <h3 className="text-lg font-medium">{character.name}</h3>
