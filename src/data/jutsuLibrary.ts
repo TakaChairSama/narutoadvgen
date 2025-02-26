@@ -60,10 +60,11 @@ export function getJutsu(
     j.nature && elements.includes(j.nature)
   );
 
-  // Select random jutsu from each pool
-  const selectedSpecialtyJutsu = selectRandomJutsu(specialtyJutsu, specialtyCount);
-  const selectedElementalJutsu = selectRandomJutsu(elementalJutsu, elementalCount);
+  // Select random jutsu from each pool, ensuring we don't exceed available counts
+  const selectedSpecialtyJutsu = selectRandomJutsu(specialtyJutsu, Math.min(specialtyCount, specialtyJutsu.length));
+  const selectedElementalJutsu = selectRandomJutsu(elementalJutsu, Math.min(elementalCount, elementalJutsu.length));
 
-  // Combine and return selected jutsu
-  return [...selectedSpecialtyJutsu, ...selectedElementalJutsu];
+  // Combine and return selected jutsu, ensuring uniqueness
+  const combinedJutsu = [...selectedSpecialtyJutsu, ...selectedElementalJutsu];
+  return Array.from(new Set(combinedJutsu));
 }
