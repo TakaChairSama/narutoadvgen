@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { serializeCharacter, deserializeCharacter } from './utils/serialization'; // Import the serialization functions
 import { ScrollText, Swords, User } from 'lucide-react';
 import {
   CHAKRA_NATURES,
