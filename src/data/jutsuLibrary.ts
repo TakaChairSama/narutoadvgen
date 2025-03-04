@@ -51,16 +51,19 @@ export function getJutsu(
   const rankFilteredJutsu = BASIC_JUTSU.filter(j => allowedRanks.includes(j.rank));
 
   // Get specialty jutsu
-  const specialtyJutsu = rankFilteredJutsu.filter(j => 
-    j.keywords?.includes(specialty)
-  );
+  let specialtyJutsu; // Declare specialtyJutsu outside the if...else
 
-  // If specialty is Ninjutsu, filter by elements
-    if (specialty === 'Ninjutsu') {
-        specialtyJutsu = specialtyJutsu.filter(j =>
-            !j.nature || elements.includes(j.nature)
-        );
-    }
+if (specialty === 'Ninjutsu') {
+    specialtyJutsu = specialtyJutsu.filter(j =>
+        !j.nature || elements.includes(j.nature)
+    );
+} else {
+    specialtyJutsu = rankFilteredJutsu.filter(j =>
+        j.keywords?.includes(specialty)
+    );
+}
+
+  
 
   // Get elemental jutsu
   const elementalJutsu = rankFilteredJutsu.filter(j => 
