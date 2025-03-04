@@ -51,7 +51,8 @@ export function getJutsu(
   const rankFilteredJutsu = BASIC_JUTSU.filter(j => allowedRanks.includes(j.rank));
 
   // Get specialty jutsu
-  let specialtyJutsu; // Declare specialtyJutsu outside the if...else
+  let specialtyJutsu = rankFilteredJutsu.filter(j =>
+        j.keywords?.includes(specialty); // Declare specialtyJutsu outside the if...else
 
 if (specialty === 'Ninjutsu') {
     specialtyJutsu = specialtyJutsu.filter(j =>
