@@ -55,6 +55,13 @@ export function getJutsu(
     j.keywords?.includes(specialty)
   );
 
+  // If specialty is Ninjutsu, filter by elements
+    if (specialty === 'Ninjutsu') {
+        specialtyJutsu = specialtyJutsu.filter(j =>
+            !j.nature || elements.includes(j.nature)
+        );
+    }
+
   // Get elemental jutsu
   const elementalJutsu = rankFilteredJutsu.filter(j => 
     j.nature && elements.includes(j.nature)
