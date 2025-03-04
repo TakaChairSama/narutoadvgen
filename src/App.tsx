@@ -307,7 +307,7 @@ function App() {
                 <div className="border-b pb-4">
                   <h3 className="text-lg font-medium">{character.name}</h3>
                   <p className="text-gray-600">
-                    CR {character.cr} ({character.xp} XP)
+                    LVL {character.cr} ({character.xp} XP)
                   </p>
                 </div>
 
