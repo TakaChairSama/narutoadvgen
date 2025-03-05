@@ -248,13 +248,14 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
         const rolls = Array(4)
             .fill(0)
             .map(() => rollDice(6));
-        return rolls
+        const sum = rolls
             .sort((a, b) => b - a)
             .slice(0, 3)
             .reduce((a, b) => a + b, 0);
+        return Math.max(sum, 8); // Set minimum stat value to 8
     });
 
-    // Create an array of stat names
+   // Create an array of stat names
     const statNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
     // Pair rolled values with stat names
@@ -267,16 +268,12 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     const finalStats: Record<string, number> = {};
     finalStats[primaryStatKey] = pairedStats[0].value; // Assign highest to primary stat
 
-    // Remove the assigned primary stat value from the list
-    pairedStats.shift(); // Remove the first element (highest)
-
-    // Randomize the remaining stats
-    const remainingStats = pairedStats.sort(() => Math.random() - 0.5); // Shuffle the remaining stats
-
     // Assign the remaining values to the other stats
-    remainingStats.forEach(({ stat, value }) => {
-        finalStats[stat] = value;
-    });
+    for (const { stat, value } of pairedStats) {
+        if (stat !== primaryStatKey && !finalStats[stat]) { // Check if stat is NOT primary and NOT already assigned
+            finalStats[stat] = value;
+        }
+    }
 
     // Add random stat bonuses based on CR/2 (rounded up) only to the primary stat
     const bonusPoints = Math.ceil(cr / 2);
@@ -284,6 +281,7 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
 
     return finalStats;
 }
+
 export function calculateModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
