@@ -655,27 +655,32 @@ export function generateCharacter(
     // Get clan features
     const abilities = getClanFeatures(clan, level);
 
-    return {
-        name: `${clan} ${rank}`,
-        clan,
-        rank: actualRank,
-        cr,
-        xp: XP_BY_CR[cr],
-        chakraNatures,
-        specialty,
-        stats,
-        modifiers,
-        hp: totalHP,
-        maxHp: totalHP,
-        chakra: totalChakra,
-        maxChakra: totalChakra,
-        ac: 11 + Math.floor((stats.dex - 10) / 2) + cr + 3,
-        speed: 30,
-        attackMods,
-        saveDCs,
-        jutsu,
-        weapons,
-        abilities,
-        proficiencyBonus,
-    };
+    // Assuming finalStats is already populated with the generated stats
+const standardStatOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+const orderedStats = Object.fromEntries(standardStatOrder.map(stat => [stat, finalStats[stat]]));
+
+// Return the final object with stats in the standard order
+return {
+    name: `${clan} ${rank}`,
+    clan,
+    rank: actualRank,
+    cr,
+    xp: XP_BY_CR[cr],
+    chakraNatures,
+    specialty,
+    stats: orderedStats, // Use the ordered stats here
+    modifiers,
+    hp: totalHP,
+    maxHp: totalHP,
+    chakra: totalChakra,
+    maxChakra: totalChakra,
+    ac: 11 + Math.floor((finalStats.dex - 10) / 2) + cr + 3,
+    speed: 30,
+    attackMods,
+    saveDCs,
+    jutsu,
+    weapons,
+    abilities,
+    proficiencyBonus,
+};
 }
