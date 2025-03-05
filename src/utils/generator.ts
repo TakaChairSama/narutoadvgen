@@ -297,10 +297,9 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     const bonusPoints = Math.ceil(cr / 2);
     finalStats[primaryStatKey] += bonusPoints;
 
-    // Ensure all six stats have values
-    const allStatNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
-    for (const stat of allStatNames) {
-        if (!(stat in finalStats)) {
+    // Ensure all stats except the primary stat have values
+    for (const stat of statNames) {
+        if (stat !== primaryStatKey && !(stat in finalStats)) {
             // Roll for the missing stat
             let newValue;
             do {
