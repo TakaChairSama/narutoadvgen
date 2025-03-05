@@ -277,11 +277,6 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
         finalStats[stat] = stats[stat];
     });
 
-    // Ensure Charisma has a 10% chance to be higher than Constitution
-    if (Math.random() < 0.1) { // 10% chance for Charisma to be second highest
-        finalStats.cha = Math.max(finalStats.cha, finalStats.con);
-    }
-
     // Add random stat bonuses based on CR/2 (rounded up) only to the primary stat
     const bonusPoints = Math.ceil(cr / 2);
     finalStats[primaryStat] += bonusPoints;
