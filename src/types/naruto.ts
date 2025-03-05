@@ -120,6 +120,16 @@ export interface NinjaCharacter {
   maxChakra: number;
   ac: number;
   speed: number;
+  attackMods: {
+    ninjutsu: number;
+    taijutsu: number;
+    genjutsu: number;
+  };
+  saveDCs: {
+    ninjutsu: number;
+    taijutsu: number;
+    genjutsu: number;
+  };
   jutsu: Jutsu[];
   weapons: Weapon[];
   abilities: string[];
