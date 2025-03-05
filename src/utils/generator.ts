@@ -17,7 +17,9 @@ import {
   WEAPON_TRAITS,
   WEAPON_PROPERTIES,
 } from '../data/naruto';
-import { getJutsu } from '../data/jutsuLibrary';
+import { getJutsu as getJutsuFromLibrary } from '../data/jutsuLibrary';
+
+export { getJutsu } from '../data/jutsuLibrary';
 
 // Import clan-specific data
 import { ABURAME_FEATURES, ABURAME_JUTSU } from '../data/clans/aburame';
@@ -220,11 +222,11 @@ CLAN_DATA.set('Tsuchigumo', {
   jutsu: TSUCHIGUMO_JUTSU,
 });
 
-function rollDice(sides: number): number {
+export function rollDice(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
 }
 
-function generateStats(cr: number): Record<string, number> {
+export function generateStats(cr: number): Record<string, number> {
   const stats = ['str', 'dex', 'con', 'int', 'wis', 'cha'].reduce(
     (acc, stat) => {
       const rolls = Array(4)
@@ -242,7 +244,7 @@ function generateStats(cr: number): Record<string, number> {
   // Add random stat bonuses based on CR/2 (rounded up)
   const bonusPoints = Math.ceil(cr / 2);
   const statKeys = Object.keys(stats);
-  
+
   for (let i = 0; i < bonusPoints; i++) {
     const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
     stats[randomStat] += 1;
@@ -251,21 +253,27 @@ function generateStats(cr: number): Record<string, number> {
   return stats;
 }
 
-function calculateModifier(score: number): number {
+export function calculateModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
-function calculateMaxHp(cr: number, conMod: number): number {
-  const baseHP = Array(cr).fill(0).map(() => rollDice(12)).reduce((a, b) => a + b, 0);
-  return baseHP + (conMod * cr) + 10 + conMod; // Adjust as per your HP calculation logic
+export function calculateMaxHp(cr: number, conMod: number): number {
+  const baseHP = Array(cr)
+    .fill(0)
+    .map(() => rollDice(12))
+    .reduce((a, b) => a + b, 0);
+  return baseHP + conMod * cr + 10 + conMod; // Adjust as per your HP calculation logic
 }
 
-function calculateMaxChakra(cr: number, conMod: number): number {
-  const baseChakra = Array(cr).fill(0).map(() => rollDice(12)).reduce((a, b) => a + b, 0);
-  return baseChakra + (conMod * cr) + 10 + conMod; // Adjust as per your Chakra calculation logic
+export function calculateMaxChakra(cr: number, conMod: number): number {
+  const baseChakra = Array(cr)
+    .fill(0)
+    .map(() => rollDice(12))
+    .reduce((a, b) => a + b, 0);
+  return baseChakra + conMod * cr + 10 + conMod; // Adjust as per your Chakra calculation logic
 }
 
-function generateWeapon(cr: number): Weapon {
+export function generateWeapon(cr: number): Weapon {
   // Select base weapon
   const baseWeapon =
     WEAPON_TYPES[Math.floor(Math.random() * WEAPON_TYPES.length)];
@@ -288,13 +296,17 @@ function generateWeapon(cr: number): Weapon {
   let traits: string[] = [];
   if (hasSpecialTraits) {
     const numTraits = rollDice(2);
-    const availableTraits = WEAPON_TRAITS.filter(trait => {
+    const availableTraits = WEAPON_TRAITS.filter((trait) => {
       // Filter traits based on rarity
       return (
         (rarity === 'common' && trait.rarity === 'common') ||
-        (rarity === 'uncommon' && (trait.rarity === 'common' || trait.rarity === 'uncommon')) ||
-        (rarity === 'rare' && (trait.rarity === 'common' || trait.rarity === 'uncommon' || trait.rarity === 'rare')) ||
-        (rarity === 'very rare')
+        (rarity === 'uncommon' &&
+          (trait.rarity === 'common' || trait.rarity === 'uncommon')) ||
+        (rarity === 'rare' &&
+          (trait.rarity === 'common' ||
+            trait.rarity === 'uncommon' ||
+            trait.rarity === 'rare')) ||
+        rarity === 'very rare'
       );
     });
 
@@ -312,7 +324,7 @@ function generateWeapon(cr: number): Weapon {
   let damageBonus = 0;
   let additionalProperties = [];
 
-  traits.forEach(trait => {
+  traits.forEach((trait) => {
     if (trait === 'Legendary') {
       damageBonus += 2; // +2 damage for legendary weapons
       additionalProperties.push('Critical'); // Add critical property
@@ -326,32 +338,139 @@ function generateWeapon(cr: number): Weapon {
   });
 
   const prefixes = [
-    'Mystic', 'Sacred', 'Honored', 'Masterwork', 'Elite', 'Shadow', 'Crimson', 'Azure', 'Silent', 'Iron',
-    'Storm', 'Ember', 'Whisper', 'Serpent', 'Phantom', 'Celestial', 'Lunar', 'Solar', 'Starlight', 'Eclipse',
-    'Dragon', 'Phoenix', 'Kraken', 'Gryphon', 'Chimera', 'Void', 'Echo', 'Rune', 'Apex', 'Zenith',
-    'Nova', 'Quasar', 'Comet', 'Aurora', 'Tempest', 'Glacier', 'Inferno', 'Monsoon', 'Tundra', 'Savanna',
-    'Guardian', 'Sentinel', 'Warrior', 'Sage', 'Seeker', 'Hunter', 'Healer', 'Artisan', 'Scholar', 'Messenger',
-    'Wanderer', 'Nomad', 'Outcast', 'Rebel', 'Visionary', 'Oracle', 'Enigma', 'Legend', 'Myth', 'Destiny'
+    'Mystic',
+    'Sacred',
+    'Honored',
+    'Masterwork',
+    'Elite',
+    'Shadow',
+    'Crimson',
+    'Azure',
+    'Silent',
+    'Iron',
+    'Storm',
+    'Ember',
+    'Whisper',
+    'Serpent',
+    'Phantom',
+    'Celestial',
+    'Lunar',
+    'Solar',
+    'Starlight',
+    'Eclipse',
+    'Dragon',
+    'Phoenix',
+    'Kraken',
+    'Gryphon',
+    'Chimera',
+    'Void',
+    'Echo',
+    'Rune',
+    'Apex',
+    'Zenith',
+    'Nova',
+    'Quasar',
+    'Comet',
+    'Aurora',
+    'Tempest',
+    'Glacier',
+    'Inferno',
+    'Monsoon',
+    'Tundra',
+    'Savanna',
+    'Guardian',
+    'Sentinel',
+    'Warrior',
+    'Sage',
+    'Seeker',
+    'Hunter',
+    'Healer',
+    'Artisan',
+    'Scholar',
+    'Messenger',
+    'Wanderer',
+    'Nomad',
+    'Outcast',
+    'Rebel',
+    'Visionary',
+    'Oracle',
+    'Enigma',
+    'Legend',
+    'Myth',
+    'Destiny',
   ];
 
   const suffixes = [
-    'of the Storm', 'of the Flame', 'of the Mountain', 'of the River', 'of the Forest', 'of the Sky',
-    'of the Abyss', 'of the Void', 'of the Shadow', 'of the Light', 'of the Earth', 'of the Wind',
-    'of the Thunder', 'of the Ice', 'of the Lava', 'of the Crystal', 'of the Silent Blade',
-    'of the Crimson Fist', 'of the Azure Eye', 'of the Iron Heart', 'of the Storm Bringer',
-    'of the Ember Hand', 'of the Whisper Wind', 'of the Serpent\'s Kiss', 'of the Phantom Strike',
-    'of the Celestial Dance', 'of the Lunar Tear', 'of the Solar Flare', 'of the Starlight Path',
-    'of the Eclipse Shadow', 'of the Dragon\'s Breath', 'of the Phoenix Cry', 'of the Kraken\'s Grip',
-    'of the Gryphon\'s Flight', 'of the Chimera\'s Rage', 'of the Void\'s Embrace', 'of the Echoing Soul',
-    'of the Rune Master', 'of the Apex Predator', 'of the Zenith Warrior', 'of the Nova Blast',
-    'of the Quasar Pulse', 'of the Comet Tail', 'of the Aurora Veil', 'of the Tempest Fury',
-    'of the Glacier\'s Touch', 'of the Inferno\'s Heart', 'of the Monsoon\'s Wrath', 'of the Tundra\'s Grip',
-    'of the Savanna\'s Roar', 'of the Guardian\'s Shield', 'of the Sentinel\'s Watch', 'of the Warrior\'s Path',
-    'of the Sage\'s Wisdom', 'of the Seeker\'s Quest', 'of the Hunter\'s Eye', 'of the Healer\'s Touch',
-    'of the Artisan\'s Craft', 'of the Scholar\'s Mind', 'of the Messenger\'s Swiftness',
-    'of the Wanderer\'s Journey', 'of the Nomad\'s Life', 'of the Outcast\'s Strength',
-    'of the Rebel\'s Spirit', 'of the Visionary\'s Dream', 'of the Oracle\'s Sight',
-    'of the Enigma\'s Riddle', 'of the Legend\'s Tale', 'of the Myth\'s Power', 'of the Destiny\'s Call'
+    'of the Storm',
+    'of the Flame',
+    'of the Mountain',
+    'of the River',
+    'of the Forest',
+    'of the Sky',
+    'of the Abyss',
+    'of the Void',
+    'of the Shadow',
+    'of the Light',
+    'of the Earth',
+    'of the Wind',
+    'of the Thunder',
+    'of the Ice',
+    'of the Lava',
+    'of the Crystal',
+    'of the Silent Blade',
+    'of the Crimson Fist',
+    'of the Azure Eye',
+    'of the Iron Heart',
+    'of the Storm Bringer',
+    'of the Ember Hand',
+    'of the Whisper Wind',
+    "of the Serpent's Kiss",
+    'of the Phantom Strike',
+    'of the Celestial Dance',
+    'of the Lunar Tear',
+    'of the Solar Flare',
+    'of the Starlight Path',
+    'of the Eclipse Shadow',
+    "of the Dragon's Breath",
+    'of the Phoenix Cry',
+    "of the Kraken's Grip",
+    "of the Gryphon's Flight",
+    "of the Chimera's Rage",
+    "of the Void's Embrace",
+    'of the Echoing Soul',
+    'of the Rune Master',
+    'of the Apex Predator',
+    'of the Zenith Warrior',
+    'of the Nova Blast',
+    'of the Quasar Pulse',
+    'of the Comet Tail',
+    'of the Aurora Veil',
+    'of the Tempest Fury',
+    "of the Glacier's Touch",
+    "of the Inferno's Heart",
+    "of the Monsoon's Wrath",
+    "of the Tundra's Grip",
+    "of the Savanna's Roar",
+    "of the Guardian's Shield",
+    "of the Sentinel's Watch",
+    "of the Warrior's Path",
+    "of the Sage's Wisdom",
+    "of the Seeker's Quest",
+    "of the Hunter's Eye",
+    "of the Healer's Touch",
+    "of the Artisan's Craft",
+    "of the Scholar's Mind",
+    "of the Messenger's Swiftness",
+    "of the Wanderer's Journey",
+    "of the Nomad's Life",
+    "of the Outcast's Strength",
+    "of the Rebel's Spirit",
+    "of the Visionary's Dream",
+    "of the Oracle's Sight",
+    "of the Enigma's Riddle",
+    "of the Legend's Tale",
+    "of the Myth's Power",
+    "of the Destiny's Call",
   ];
 
   const name = hasSpecialTraits
@@ -374,7 +493,7 @@ function generateWeapon(cr: number): Weapon {
   };
 }
 
-function getClanJutsu(clan: NinjaClan, rank: NinjaRank): Jutsu[] {
+export function getClanJutsu(clan: NinjaClan, rank: NinjaRank): Jutsu[] {
   const clanData = CLAN_DATA.get(clan);
   if (!clanData) return [];
 
@@ -398,7 +517,7 @@ function getClanJutsu(clan: NinjaClan, rank: NinjaRank): Jutsu[] {
   }));
 }
 
-function getClanFeatures(clan: NinjaClan, level: number): string[] {
+export function getClanFeatures(clan: NinjaClan, level: number): string[] {
   const clanData = CLAN_DATA.get(clan);
   if (!clanData) return CLAN_ABILITIES[clan] || [];
 
@@ -415,20 +534,38 @@ export function generateCharacter(
 ): NinjaCharacter {
   const [minCR, maxCR] = CR_RANGES[rank];
   const cr = Math.floor(Math.random() * (maxCR - minCR + 1)) + minCR;
+  
+  // Determine initial rank based on CR
+  let actualRank: NinjaRank;
+  if (cr <= 4) actualRank = 'Genin';
+  else if (cr <= 8) actualRank = 'Chunin';
+  else if (cr <= 12) actualRank = 'Jonin';
+  else if (cr <= 16) actualRank = 'ANBU';
+  else actualRank = 'Kage';
+
   const stats = generateStats(cr); // Pass cr as an argument
-  const modifiers = Object.entries(stats).reduce((acc, [key, value]) => ({
-    ...acc,
-    [key]: calculateModifier(value)
-  }), {});
+  const modifiers = Object.entries(stats).reduce(
+    (acc, [key, value]) => ({
+      ...acc,
+      [key]: calculateModifier(value),
+    }),
+    {}
+  );
   const proficiencyBonus = Math.floor((cr - 1) / 4) + 2;
   const level = Math.floor((cr + 1) / 2);
 
   const conMod = modifiers.con;
-  const baseHP = Array(cr).fill(0).map(() => rollDice(12)).reduce((a, b) => a + b, 0);
-  const totalHP = baseHP + (conMod * cr) + 10 + conMod;
+  const baseHP = Array(cr)
+    .fill(0)
+    .map(() => rollDice(12))
+    .reduce((a, b) => a + b, 0);
+  const totalHP = baseHP + conMod * cr + 10 + conMod;
 
-  const baseChakra = Array(cr).fill(0).map(() => rollDice(12)).reduce((a, b) => a + b, 0);
-  const totalChakra = baseChakra + (conMod * cr) + 10 + conMod;
+  const baseChakra = Array(cr)
+    .fill(0)
+    .map(() => rollDice(12))
+    .reduce((a, b) => a + b, 0);
+  const totalChakra = baseChakra + conMod * cr + 10 + conMod;
 
   // Generate 1-3 weapons
   const weapons = Array(rollDice(3))
@@ -437,9 +574,9 @@ export function generateCharacter(
 
   // Get clan-specific jutsu
   const clanJutsu = getClanJutsu(clan, rank);
-  
+
   // Get general jutsu based on rank, specialty, and elements
-  const generalJutsu = getJutsu(rank, specialty, chakraNatures);
+  const generalJutsu = getJutsuFromLibrary(rank, specialty, chakraNatures);
 
   // Combine clan jutsu with general jutsu
   const jutsu = [...clanJutsu, ...generalJutsu];
@@ -450,7 +587,7 @@ export function generateCharacter(
   return {
     name: `${clan} ${rank}`,
     clan,
-    rank,
+    rank: actualRank,
     cr,
     xp: XP_BY_CR[cr],
     chakraNatures,
