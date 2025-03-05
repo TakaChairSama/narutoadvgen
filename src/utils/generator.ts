@@ -311,7 +311,13 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
         }
     }
 
-    return finalStats;
+  const orderedStats: Record<string, number> = {};
+    const standardStatOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+    for (const stat of standardStatOrder) {
+        orderedStats[stat] = finalStats[stat] || 10; // Default to 10 if stat is missing
+    }
+
+    return orderedStats;
 }
 
 export function calculateModifier(score: number): number {
