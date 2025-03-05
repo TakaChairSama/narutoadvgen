@@ -525,10 +525,10 @@ function App() {
                   {Object.entries(character.stats).map(([stat, value]) => (
                     <div key={stat} className="bg-gray-50 p-2 rounded">
                       <div className="text-sm text-gray-600 uppercase">
-                        {Math.floor(stat)}
+                        {stat}
                       </div>
                       <div className="font-bold">
-                        {value} ({character.modifiers[stat] >= 0 ? '+' : ''}
+                        {Math.floor(value)} ({character.modifiers[stat] >= 0 ? '+' : ''}
                         {character.modifiers[stat]})
                       </div>
                     </div>
