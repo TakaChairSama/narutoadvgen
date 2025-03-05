@@ -297,19 +297,13 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     const bonusPoints = Math.ceil(cr / 2);
     finalStats[primaryStatKey] += bonusPoints;
 
-    // Ensure all stats except the primary stat have values
+        // Ensure all stats except the primary stat have values
     for (const stat of statNames) {
         if (stat !== primaryStatKey && !(stat in finalStats)) {
-            // Roll for the missing stat
             let newValue;
             do {
-                const rolls = Array(4)
-                    .fill(0)
-                    .map(() => rollDice(6));
-                const sum = rolls
-                    .sort((a, b) => b - a)
-                    .slice(0, 3)
-                    .reduce((a, b) => a + b, 0);
+                const rolls = Array.from({ length: 4 }, () => rollDice(6));
+                const sum = rolls.sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
                 newValue = Math.max(sum, 8);
             } while (Object.values(finalStats).includes(newValue)); // Ensure it's unique
 
