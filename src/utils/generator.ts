@@ -259,7 +259,12 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
 
     // Prepare final stats object
     const finalStats = {
-        [primaryStat]: 0, // Initialize primary stat
+        str: stats.str,
+        dex: stats.dex,
+        con: stats.con,
+        int: stats.int,
+        wis: stats.wis,
+        cha: stats.cha,
     };
 
     // Assign the highest stat to primaryStat
@@ -268,14 +273,6 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     // Assign the second highest stat (Constitution or Charisma)
     const secondHighestStat = sortedStats[1][0]; // Get the key of the second highest stat
     finalStats[secondHighestStat] = stats[secondHighestStat];
-
-    // Randomly assign the rest of the stats
-    const remainingStats = sortedStats.slice(2).map(([key]) => key);
-    
-    // Assign values to the remaining stats
-    remainingStats.forEach(stat => {
-        finalStats[stat] = stats[stat];
-    });
 
     // Add random stat bonuses based on CR/2 (rounded up) only to the primary stat
     const bonusPoints = Math.ceil(cr / 2);
