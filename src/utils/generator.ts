@@ -227,23 +227,8 @@ export function rollDice(sides: number): number {
 }
 
 export function generateStats(cr: number, specialty: NinjaSpecialty): Record<string, number> {
-    // Roll stats for all attributes
-    const stats = ['str', 'dex', 'con', 'int', 'wis', 'cha'].reduce(
-        (acc, stat) => {
-            const rolls = Array(4)
-                .fill(0)
-                .map(() => rollDice(6));
-            const sum = rolls
-                .sort((a, b) => b - a)
-                .slice(0, 3)
-                .reduce((a, b) => a + b, 0);
-            return { ...acc, [stat]: sum };
-        },
-        {}
-    );
-
     // Determine the primary stat based on specialty
-    const primaryStat = {
+    const primaryStatKey = {
         Ninjutsu: 'int',
         Bukijutsu: 'dex',
         Genjutsu: 'wis',
@@ -251,34 +236,29 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
         Fuinjutsu: 'int',
     }[specialty];
 
-    // Create an array of stats to sort and find the highest and second highest
-    const statEntries = Object.entries(stats);
-    
-    // Sort stats in descending order
-    const sortedStats = statEntries.sort((a, b) => b[1] - a[1]);
-
-    // Prepare final stats object
-    const finalStats = {
-        str: stats.str,
-        dex: stats.dex,
-        con: stats.con,
-        int: stats.int,
-        wis: stats.wis,
-        cha: stats.cha,
-    };
-
-    // Assign the highest stat to primaryStat
-    finalStats[primaryStat] = stats[primaryStat];
-
-    // Assign the second highest stat (Constitution or Charisma)
-    const secondHighestStat = sortedStats[1][0]; // Get the key of the second highest stat
-    finalStats[secondHighestStat] = stats[secondHighestStat];
+    // Roll stats for all attributes
+    const stats = ['str', 'dex', 'con', 'int', 'wis', 'cha'].reduce((acc, stat) => {
+        const rolls = Array(4)
+            .fill(0)
+            .map(() => rollDice(6));
+        const sum = rolls
+            .sort((a, b) => b - a)
+            .slice(0, 3)
+            .reduce((a, b) => a + b, 0);
+        
+        // Assign the highest rolled value to the primary stat
+        if (stat === primaryStatKey) {
+            return { ...acc, [stat]: Math.max(sum, acc[stat] || 0) }; // Ensure primary stat gets the highest value
+        }
+        
+        return { ...acc, [stat]: sum };
+    }, {});
 
     // Add random stat bonuses based on CR/2 (rounded up) only to the primary stat
     const bonusPoints = Math.ceil(cr / 2);
-    finalStats[primaryStat] += bonusPoints;
+    stats[primaryStatKey] += bonusPoints;
 
-    return finalStats;
+    return stats;
 }
 
 export function calculateModifier(score: number): number {
