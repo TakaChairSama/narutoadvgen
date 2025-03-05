@@ -227,14 +227,21 @@ export function rollDice(sides: number): number {
 }
 
 export function generateStats(cr: number, specialty: NinjaSpecialty): Record<string, number> {
-    // Determine the primary stat based on specialty
-    const primaryStatKey = {
-        Ninjutsu: 'int',
-        Bukijutsu: 'dex',
-        Genjutsu: 'wis',
-        Taijutsu: 'str',
-        Fuinjutsu: 'int',
-    }[specialty];
+    // Determine the primary stat based on specialty using if statements
+    let primaryStatKey: string;
+    if (specialty === 'Ninjutsu') {
+        primaryStatKey = 'int';
+    } else if (specialty === 'Bukijutsu') {
+        primaryStatKey = 'dex';
+    } else if (specialty === 'Genjutsu') {
+        primaryStatKey = 'wis';
+    } else if (specialty === 'Taijutsu') {
+        primaryStatKey = 'str';
+    } else if (specialty === 'Fuinjutsu') {
+        primaryStatKey = 'int';
+    } else {
+        throw new Error('Invalid specialty'); // Handle invalid specialty
+    }
 
     // Roll stats for all attributes
     const rolledValues = Array.from({ length: 6 }, () => {
@@ -277,7 +284,6 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
 
     return finalStats;
 }
-
 export function calculateModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
