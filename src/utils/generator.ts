@@ -227,7 +227,7 @@ export function rollDice(sides: number): number {
 }
 
 export function generateStats(cr: number, specialty: NinjaSpecialty): Record<string, number> {
-    // Determine the primary stat based on specialty
+    // Determine the primary stat based on specialty using if statements
     let primaryStatKey: string;
     if (specialty === 'Ninjutsu') {
         primaryStatKey = 'int';
@@ -297,24 +297,22 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     const bonusPoints = Math.ceil(cr / 2);
     finalStats[primaryStatKey] += bonusPoints;
 
-    // Ensure all stats except the primary stat have values
+        // Ensure all stats except the primary stat have values
     for (const stat of statNames) {
-    if (stat !== primaryStatKey && !(stat in finalStats)) {
-        const rolls = Array.from({ length: 4 }, () => rollDice(6));
-        const sum = rolls.sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
-        const newValue = Math.max(sum, 8);
-        finalStats[stat] = newValue;
+        if (stat !== primaryStatKey && !(stat in finalStats)) {
+            let newValue;
+            do {
+                const rolls = Array.from({ length: 4 }, () => rollDice(6));
+                const sum = rolls.sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
+                newValue = Math.max(sum, 8);
+            } while (Object.values(finalStats).includes(newValue)); // Ensure it's unique
+
+            finalStats[stat] = newValue; // Assign the new value
+        }
     }
+
+    return finalStats;
 }
-
-    // Create an ordered stats object
-    const orderedStats: Record<string, number> = {};
-    const standardStatOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
-    for (const stat of standardStatOrder) {
-        orderedStats[stat] = finalStats[stat] || 0; // Default to 0 if stat is missing
-    }
-
-    return orderedStats }
 
 export function calculateModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -657,28 +655,27 @@ export function generateCharacter(
     // Get clan features
     const abilities = getClanFeatures(clan, level);
 
-// Return the final object with stats in the standard order
-return {
-    name: `${clan} ${rank}`,
-    clan,
-    rank: actualRank,
-    cr,
-    xp: XP_BY_CR[cr],
-    chakraNatures,
-    specialty,
-    stats,
-    modifiers,
-    hp: totalHP,
-    maxHp: totalHP,
-    chakra: totalChakra,
-    maxChakra: totalChakra,
-    ac: 11 + Math.floor((finalStats.dex - 10) / 2) + cr + 3,
-    speed: 30,
-    attackMods,
-    saveDCs,
-    jutsu,
-    weapons,
-    abilities,
-    proficiencyBonus,
-};
+    return {
+        name: `${clan} ${rank}`,
+        clan,
+        rank: actualRank,
+        cr,
+        xp: XP_BY_CR[cr],
+        chakraNatures,
+        specialty,
+        stats,
+        modifiers,
+        hp: totalHP,
+        maxHp: totalHP,
+        chakra: totalChakra,
+        maxChakra: totalChakra,
+        ac: 11 + Math.floor((stats.dex - 10) / 2) + cr + 3,
+        speed: 30,
+        attackMods,
+        saveDCs,
+        jutsu,
+        weapons,
+        abilities,
+        proficiencyBonus,
+    };
 }
