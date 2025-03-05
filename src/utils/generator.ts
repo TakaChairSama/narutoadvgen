@@ -567,6 +567,19 @@ export function generateCharacter(
     .reduce((a, b) => a + b, 0);
   const totalChakra = baseChakra + conMod * cr + 10 + conMod;
 
+  // Calculate attack modifiers and save DCs
+  const attackMods = {
+    ninjutsu: proficiencyBonus + modifiers.int,
+    taijutsu: proficiencyBonus + modifiers.str,
+    genjutsu: proficiencyBonus + modifiers.wis
+  };
+
+  const saveDCs = {
+    ninjutsu: 8 + proficiencyBonus + modifiers.int,
+    taijutsu: 8 + proficiencyBonus + modifiers.str,
+    genjutsu: 8 + proficiencyBonus + modifiers.wis
+  };
+
   // Generate 1-3 weapons
   const weapons = Array(rollDice(3))
     .fill(0)
@@ -600,6 +613,8 @@ export function generateCharacter(
     maxChakra: totalChakra,
     ac: 10 + Math.floor((stats.dex - 10) / 2) + cr,
     speed: 30,
+    attackMods,
+    saveDCs,
     jutsu,
     weapons,
     abilities,
