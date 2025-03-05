@@ -237,29 +237,34 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     }[specialty];
 
     // Roll stats for all attributes
-    const rolledStats = ['str', 'dex', 'con', 'int', 'wis', 'cha'].map(stat => {
+    const rolledValues = Array.from({ length: 6 }, () => {
         const rolls = Array(4)
             .fill(0)
             .map(() => rollDice(6));
-        const sum = rolls
+        return rolls
             .sort((a, b) => b - a)
             .slice(0, 3)
             .reduce((a, b) => a + b, 0);
-        return { stat, value: sum };
     });
 
-    // Sort rolled stats from highest to lowest
-    rolledStats.sort((a, b) => b.value - a.value);
+    // Create an array of stat names
+    const statNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+
+    // Pair rolled values with stat names
+    const pairedStats = statNames.map((stat, index) => ({ stat, value: rolledValues[index] }));
+
+    // Sort paired stats from highest to lowest
+    pairedStats.sort((a, b) => b.value - a.value);
 
     // Assign the highest value to the primary stat
     const finalStats: Record<string, number> = {};
-    finalStats[primaryStatKey] = rolledStats[0].value; // Assign highest to primary stat
+    finalStats[primaryStatKey] = pairedStats[0].value; // Assign highest to primary stat
 
-    // Remove the assigned primary stat from the rolled stats
-    rolledStats.shift(); // Remove the first element (highest)
+    // Remove the assigned primary stat value from the list
+    pairedStats.shift(); // Remove the first element (highest)
 
     // Randomize the remaining stats
-    const remainingStats = rolledStats.sort(() => Math.random() - 0.5); // Shuffle the remaining stats
+    const remainingStats = pairedStats.sort(() => Math.random() - 0.5); // Shuffle the remaining stats
 
     // Assign the remaining values to the other stats
     remainingStats.forEach(({ stat, value }) => {
