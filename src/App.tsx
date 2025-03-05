@@ -1,14 +1,34 @@
 import React, { useState } from 'react';
-import { serializeCharacter, deserializeCharacter } from './utils/serialization'; // Import the serialization functions
+import {
+  serializeCharacter,
+  deserializeCharacter,
+} from './utils/serialization'; // Import the serialization functions
+import { rollDice, calculateModifier } from './utils/generator';
 import { ScrollText, Swords, User } from 'lucide-react';
 import {
   CHAKRA_NATURES,
   NINJA_CLANS,
   NINJA_RANKS,
-  NINJA_SPECIALTIES
+  NINJA_SPECIALTIES,
+  XP_BY_CR,
 } from './data/naruto';
-import { generateCharacter } from './utils/generator';
-import type { NinjaCharacter, ChakraNature, NinjaClan, NinjaRank, NinjaSpecialty, Jutsu } from './types/naruto';
+import {
+  generateCharacter,
+  generateStats,
+  calculateMaxHp,
+  calculateMaxChakra,
+  getClanJutsu,
+  getClanFeatures,
+  getJutsu,
+} from './utils/generator';
+import type {
+  NinjaCharacter,
+  ChakraNature,
+  NinjaClan,
+  NinjaRank,
+  NinjaSpecialty,
+  Jutsu,
+} from './types/naruto';
 
 interface JutsuDetailsProps {
   jutsu: Jutsu;
@@ -18,7 +38,7 @@ function JutsuDetails({ jutsu }: JutsuDetailsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div 
+    <div
       className="bg-gray-50 p-2 rounded text-sm"
       role="button"
       aria-expanded={isExpanded}
@@ -30,11 +50,11 @@ function JutsuDetails({ jutsu }: JutsuDetailsProps) {
           {jutsu.clan ? `${jutsu.clan} • ` : ''}Rank {jutsu.rank}
         </div>
       </div>
-      
+
       {isExpanded && (
         <div className="mt-2 space-y-2 text-gray-600">
           <div className="font-medium text-gray-800">{jutsu.description}</div>
-          
+
           <div className="grid grid-cols-2 gap-2">
             <div>Chakra Cost: {jutsu.chakraCost}</div>
             {jutsu.castingTime && <div>Casting Time: {jutsu.castingTime}</div>}
@@ -42,28 +62,26 @@ function JutsuDetails({ jutsu }: JutsuDetailsProps) {
             {jutsu.duration && <div>Duration: {jutsu.duration}</div>}
           </div>
 
-          {jutsu.damage && (
-            <div>Damage: {jutsu.damage}</div>
-          )}
-          
-          {jutsu.nature && (
-            <div>Nature: {jutsu.nature}</div>
-          )}
-          
+          {jutsu.damage && <div>Damage: {jutsu.damage}</div>}
+
+          {jutsu.nature && <div>Nature: {jutsu.nature}</div>}
+
           {jutsu.components && jutsu.components.length > 0 && (
             <div>Components: {jutsu.components.join(', ')}</div>
           )}
-          
+
           {jutsu.keywords && jutsu.keywords.length > 0 && (
             <div>Keywords: {jutsu.keywords.join(', ')}</div>
           )}
-          
+
           {jutsu.effects && jutsu.effects.length > 0 && (
             <div className="mt-2">
               <div className="font-medium text-gray-800 mb-1">Effects:</div>
               <ul className="list-disc list-inside space-y-1">
                 {jutsu.effects.map((effect, index) => (
-                  <li key={`${jutsu.name}-effect-${index}`} className="text-sm">{effect}</li>
+                  <li key={`${jutsu.name}-effect-${index}`} className="text-sm">
+                    {effect}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -79,16 +97,17 @@ function App() {
   const [selectedClan, setSelectedClan] = useState<NinjaClan>('None');
   const [selectedRank, setSelectedRank] = useState<NinjaRank>('Genin');
   const [selectedNatures, setSelectedNatures] = useState<ChakraNature[]>([]);
-  const [selectedSpecialty, setSelectedSpecialty] = useState<NinjaSpecialty>('Ninjutsu');
+  const [selectedSpecialty, setSelectedSpecialty] =
+    useState<NinjaSpecialty>('Ninjutsu');
   const [currentHp, setCurrentHp] = useState<number>(0);
   const [currentChakra, setCurrentChakra] = useState<number>(0);
-  
+
   const [exportedCharacter, setExportedCharacter] = useState<string>('');
   const [importedCharacter, setImportedCharacter] = useState<string>('');
 
   const handleNatureToggle = (nature: ChakraNature) => {
     if (selectedNatures.includes(nature)) {
-      setSelectedNatures(selectedNatures.filter(n => n !== nature));
+      setSelectedNatures(selectedNatures.filter((n) => n !== nature));
     } else if (selectedNatures.length < 2) {
       setSelectedNatures([...selectedNatures, nature]);
     }
@@ -142,34 +161,105 @@ function App() {
       setCurrentHp(deserialized.hp);
       setCurrentChakra(deserialized.chakra);
     } else {
-      alert("Invalid character data.");
+      alert('Invalid character data.');
     }
   };
 
   const handleLevelUp = () => {
-  if (!character) return;
+    if (!character) return;
 
-  // Determine new CR and rank
-  const newCR = character.cr + 1; // Increment CR for simplicity
-  const newRank = NINJA_RANKS[Math.min(NINJA_RANKS.indexOf(character.rank) + 1, NINJA_RANKS.length - 1)];
+    const newCR = character.cr + 1;
+    
+    // Determine rank based on level
+    let newRank: NinjaRank;
+    if (newCR <= 4) newRank = 'Genin';
+    else if (newCR <= 8) newRank = 'Chunin';
+    else if (newCR <= 12) newRank = 'Jonin';
+    else if (newCR <= 16) newRank = 'ANBU';
+    else newRank = 'Kage';
 
-  // Update character stats and abilities
-  const updatedCharacter = {
-    ...character,
-    cr: newCR,
-    rank: newRank,
-    xp: XP_BY_CR[newCR], // Update XP based on new CR
-    stats: generateStats(newCR), // Re-generate stats
-    maxHp: calculateMaxHp(newCR, character.modifiers.con), // Recalculate max HP
-    maxChakra: calculateMaxChakra(newCR, character.modifiers.con), // Recalculate max Chakra
-    jutsu: getClanJutsu(character.clan, newRank).concat(getJutsu(newRank, character.specialty, character.chakraNatures)), // Get new jutsu
-    abilities: getClanFeatures(character.clan, Math.floor((newCR + 1) / 2)), // Get new clan features
+    // Roll for new HP and Chakra
+    const hpIncrease = rollDice(12) + character.modifiers.con;
+    const chakraIncrease = rollDice(12) + character.modifiers.con;
+
+    // Update stats based on specialty
+    const specialtyStatMap = {
+      Ninjutsu: 'int',
+      Taijutsu: 'str', 
+      Genjutsu: 'wis',
+      Bukijutsu: 'dex',
+      Fuinjutsu: 'int'
+    };
+    
+    const updatedStats = { ...character.stats };
+    const statToIncrease = specialtyStatMap[character.specialty];
+    if (statToIncrease) {
+      updatedStats[statToIncrease] += 0.5;
+    }
+
+    // Calculate new modifiers
+    const updatedModifiers = Object.entries(updatedStats).reduce(
+      (acc, [key, value]) => ({
+        ...acc,
+        [key]: calculateModifier(Math.floor(value))
+      }),
+      {}
+    );
+
+    // Only add jutsu at specific levels (5, 9, 13, 17)
+    const existingJutsuNames = new Set(character.jutsu.map(j => j.name));
+    let newJutsu = [...character.jutsu];
+    
+    const level = newCR;
+    if ([5, 9, 13, 17].includes(level)) {
+      // Get one specialty jutsu
+      const rankFilteredJutsu = getJutsu(newRank, character.specialty, character.chakraNatures)
+        .filter(j => !existingJutsuNames.has(j.name)); 
+      
+      // Get specialty jutsu
+      let specialtyJutsu = rankFilteredJutsu.filter((j) =>
+        j.keywords?.includes(character.specialty)
+      );
+      
+      if (character.specialty === 'Ninjutsu') {
+        specialtyJutsu = specialtyJutsu.filter(
+          (j) => !j.nature || character.chakraNatures.includes(j.nature)
+        );
+      }
+      
+      const randomSpecialtyJutsu = specialtyJutsu.length > 0 
+        ? [specialtyJutsu[Math.floor(Math.random() * specialtyJutsu.length)]]
+        : [];
+      
+      // Get elemental jutsu
+      const elementalJutsu = rankFilteredJutsu.filter(
+        (j) => j.nature && character.chakraNatures.includes(j.nature)
+      );
+
+      const randomElementalJutsu = elementalJutsu.length > 0
+        ? [elementalJutsu[Math.floor(Math.random() * elementalJutsu.length)]]
+        : [];
+
+      newJutsu = [...character.jutsu, ...randomSpecialtyJutsu, ...randomElementalJutsu];
+    }
+
+    const updatedCharacter = {
+      ...character,
+      cr: newCR,
+      rank: newRank,
+      xp: XP_BY_CR[newCR], // Update XP based on new CR
+      stats: updatedStats,
+      modifiers: updatedModifiers,
+      maxHp: character.maxHp + hpIncrease,
+      maxChakra: character.maxChakra + chakraIncrease,
+      jutsu: newJutsu,
+      abilities: getClanFeatures(character.clan, Math.floor((newCR + 1) / 2)), // Get new clan features
+    };
+
+    setCharacter(updatedCharacter);
+    setCurrentHp(currentHp + hpIncrease); // Increase current HP by the same amount
+    setCurrentChakra(currentChakra + chakraIncrease); // Increase current Chakra by the same amount
   };
-
-  setCharacter(updatedCharacter);
-  setCurrentHp(updatedCharacter.maxHp); // Reset current HP to max
-  setCurrentChakra(updatedCharacter.maxChakra); // Reset current Chakra to max
-};
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -177,7 +267,9 @@ function App() {
         <div className="container mx-auto px-4">
           <div className="flex items-center space-x-4">
             <Swords className="w-8 h-8" />
-            <h1 className="text-2xl font-bold">Naruto 5e Adversary Generator</h1>
+            <h1 className="text-2xl font-bold">
+              Naruto 5e Adversary Generator
+            </h1>
           </div>
         </div>
       </header>
@@ -187,14 +279,14 @@ function App() {
           {/* Generator Controls */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <User  className="w-5 h-5 mr-2" />
+              <User className="w-5 h-5 mr-2" />
               Character Options
             </h2>
-            
+
             <div className="space-y-4">
               {/* Clan Selection */}
               <div>
-                <label 
+                <label
                   htmlFor="clan-select"
                   className="block text-sm font-medium text-gray-700 mb-2"
                 >
@@ -206,15 +298,17 @@ function App() {
                   value={selectedClan}
                   onChange={handleClanChange}
                 >
-                  {NINJA_CLANS.map(clan => (
-                    <option key={clan} value={clan}>{clan}</option>
+                  {NINJA_CLANS.map((clan) => (
+                    <option key={clan} value={clan}>
+                      {clan}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {/* Rank Selection */}
               <div>
-                <label 
+                <label
                   htmlFor="rank-select"
                   className="block text-sm font-medium text-gray-700 mb-2"
                 >
@@ -226,8 +320,10 @@ function App() {
                   value={selectedRank}
                   onChange={handleRankChange}
                 >
-                  {NINJA_RANKS.map(rank => (
-                    <option key={rank} value={rank}>{rank}</option>
+                  {NINJA_RANKS.map((rank) => (
+                    <option key={rank} value={rank}>
+                      {rank}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -238,11 +334,14 @@ function App() {
                   Chakra Natures (max 2)
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {CHAKRA_NATURES.map(nature => (
+                  {CHAKRA_NATURES.map((nature) => (
                     <button
                       key={nature}
                       onClick={() => handleNatureToggle(nature)}
-                      disabled={!selectedNatures.includes(nature) && selectedNatures.length >= 2}
+                      disabled={
+                        !selectedNatures.includes(nature) &&
+                        selectedNatures.length >= 2
+                      }
                       className={`p-2 rounded-md text-sm ${
                         selectedNatures.includes(nature)
                           ? 'bg-red-600 text-white'
@@ -260,7 +359,7 @@ function App() {
 
               {/* Specialty Selection */}
               <div>
-                <label 
+                <label
                   htmlFor="specialty-select"
                   className="block text-sm font-medium text-gray-700 mb-2"
                 >
@@ -272,8 +371,10 @@ function App() {
                   value={selectedSpecialty}
                   onChange={handleSpecialtyChange}
                 >
-                  {NINJA_SPECIALTIES.map(specialty => (
-                    <option key={specialty} value={specialty}>{specialty}</option>
+                  {NINJA_SPECIALTIES.map((specialty) => (
+                    <option key={specialty} value={specialty}>
+                      {specialty}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -297,17 +398,17 @@ function App() {
               </h2>
 
               <button
-  onClick={handleLevelUp}
-  className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
->
-  Level Up
-</button>
+                onClick={handleLevelUp}
+                className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+              >
+                Level Up
+              </button>
 
               <div className="space-y-4">
                 <div className="border-b pb-4">
                   <h3 className="text-lg font-medium">{character.name}</h3>
                   <p className="text-gray-600">
-                    LVL {character.cr} ({character.xp} XP)
+                    LVL {character.cr} • {character.rank.replace(/^(\w+)$/, '$1 Tier')} ({character.xp} XP)
                   </p>
                 </div>
 
@@ -334,10 +435,14 @@ function App() {
                       <input
                         type="number"
                         value={currentChakra}
-                        onChange={(e) => setCurrentChakra(Number(e.target.value))}
+                        onChange={(e) =>
+                          setCurrentChakra(Number(e.target.value))
+                        }
                         className="w-20 text-center border rounded"
                       />
-                      <span className="text-gray-500">/ {character.maxChakra}</span>
+                      <span className="text-gray-500">
+                        / {character.maxChakra}
+                      </span>
                     </div>
                   </div>
                   <div className="bg-gray-50 p-2 rounded">
@@ -349,8 +454,13 @@ function App() {
                 <div className="grid grid-cols-6 gap-2 text-center">
                   {Object.entries(character.stats).map(([stat, value]) => (
                     <div key={stat} className="bg-gray-50 p-2 rounded">
-                      <div className="text-sm text-gray-600 uppercase">{stat}</div>
-                      <div className="font-bold">{value} ({character.modifiers[stat] >= 0 ? '+' : ''}{character.modifiers[stat]})</div>
+                      <div className="text-sm text-gray-600 uppercase">
+                        {stat}
+                      </div>
+                      <div className="font-bold">
+                        {value} ({character.modifiers[stat] >= 0 ? '+' : ''}
+                        {character.modifiers[stat]})
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -368,10 +478,14 @@ function App() {
                   <h4 className="font-medium mb-2">Weapons</h4>
                   <div className="space-y-2">
                     {character.weapons.map((weapon, index) => (
-                      <div key={`weapon-${index}`} className="bg-gray-50 p-2 rounded text-sm">
+                      <div
+                        key={`weapon-${index}`}
+                        className="bg-gray-50 p-2 rounded text-sm"
+                      >
                         <div className="font-medium">{weapon.name}</div>
                         <div className="text-gray-600">
-                          {weapon.damage} damage • {weapon.properties.join(', ')}
+                          {weapon.damage} damage •{' '}
+                          {weapon.properties.join(', ')}
                         </div>
                         <div className="text-gray-600">
                           Traits: {weapon.traits.join(', ')}
@@ -395,7 +509,9 @@ function App() {
 
           {/* Import/Export Character Section */}
           <div className="bg-white rounded-lg shadow-md p-6 mt-8">
-            <h2 className="text-xl font-semibold mb-4">Import/Export Character</h2>
+            <h2 className="text-xl font-semibold mb-4">
+              Import/Export Character
+            </h2>
             <div className="space-y-4">
               <button
                 onClick={handleExport}
