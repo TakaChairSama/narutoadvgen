@@ -172,6 +172,7 @@ function App() {
     if (!character) return;
 
     const newCR = character.cr + 1;
+    const proficiencyBonus = Math.floor((newCR / 4) + 2);
     
     // Determine rank based on level
     let newRank: NinjaRank;
@@ -208,6 +209,18 @@ function App() {
       }),
       {}
     );
+    // Calculate new attack modifiers and save DCs
+    const attackMods = {
+      ninjutsu: proficiencyBonus + updatedModifiers.int,
+      taijutsu: proficiencyBonus + updatedModifiers.str,
+      genjutsu: proficiencyBonus + updatedModifiers.wis
+    };
+
+    const saveDCs = {
+      ninjutsu: 8 + proficiencyBonus + updatedModifiers.int,
+      taijutsu: 8 + proficiencyBonus + updatedModifiers.str,
+      genjutsu: 8 + proficiencyBonus + updatedModifiers.wis
+    };
 
     // Only add jutsu at specific levels (5, 9, 13, 17)
     const existingJutsuNames = new Set(character.jutsu.map(j => j.name));
@@ -256,6 +269,8 @@ function App() {
       maxHp: character.maxHp + hpIncrease,
       maxChakra: character.maxChakra + chakraIncrease,
       jutsu: newJutsu,
+      attackMods,
+      saveDCs,
       abilities: getClanFeatures(character.clan, Math.floor((newCR + 1) / 2)), // Get new clan features
     };
 
@@ -457,6 +472,49 @@ function App() {
                   <div className="bg-gray-50 p-2 rounded">
                     <div className="text-sm text-gray-600">Speed</div>
                     <div className="font-bold">{character.speed}</div>
+                  </div>
+                  <div className="bg-gray-50 p-2 rounded col-span-3">
+                    <div className="text-sm text-gray-600">Attack Modifiers</div>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      <div>
+                        <span className="text-gray-500">Ninjutsu:</span>{' '}
+                        <span className="font-bold">
+                          {character.attackMods.ninjutsu >= 0 ? '+' : ''}
+                          {character.attackMods.ninjutsu}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Taijutsu:</span>{' '}
+                        <span className="font-bold">
+                          {character.attackMods.taijutsu >= 0 ? '+' : ''}
+                          {character.attackMods.taijutsu}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Genjutsu:</span>{' '}
+                        <span className="font-bold">
+                          {character.attackMods.genjutsu >= 0 ? '+' : ''}
+                          {character.attackMods.genjutsu}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-2 rounded col-span-3">
+                    <div className="text-sm text-gray-600">Save DCs</div>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      <div>
+                        <span className="text-gray-500">Ninjutsu:</span>{' '}
+                        <span className="font-bold">DC {character.saveDCs.ninjutsu}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Taijutsu:</span>{' '}
+                        <span className="font-bold">DC {character.saveDCs.taijutsu}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Genjutsu:</span>{' '}
+                        <span className="font-bold">DC {character.saveDCs.genjutsu}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
