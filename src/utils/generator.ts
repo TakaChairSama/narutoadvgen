@@ -270,9 +270,6 @@ const rolledValues = (() => {
    // Create an array of stat names
     const statNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
-    // Create an array of stat names
-    const statNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
-
     // Pair rolled values with stat names
     const pairedStats = statNames.map((stat, index) => ({ stat, value: rolledValues[index] }));
 
