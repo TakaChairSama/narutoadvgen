@@ -226,31 +226,66 @@ export function rollDice(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
 }
 
-export function generateStats(cr: number): Record<string, number> {
-  const stats = ['str', 'dex', 'con', 'int', 'wis', 'cha'].reduce(
-    (acc, stat) => {
-      const rolls = Array(4)
-        .fill(0)
-        .map(() => rollDice(6));
-      const sum = rolls
-        .sort((a, b) => b - a)
-        .slice(0, 3)
-        .reduce((a, b) => a + b, 0);
-      return { ...acc, [stat]: sum };
-    },
-    {}
-  );
+export function generateStats(cr: number, specialty: NinjaSpecialty): Record<string, number> {
+    // Roll stats for all attributes
+    const stats = ['str', 'dex', 'con', 'int', 'wis', 'cha'].reduce(
+        (acc, stat) => {
+            const rolls = Array(4)
+                .fill(0)
+                .map(() => rollDice(6));
+            const sum = rolls
+                .sort((a, b) => b - a)
+                .slice(0, 3)
+                .reduce((a, b) => a + b, 0);
+            return { ...acc, [stat]: sum };
+        },
+        {}
+    );
 
-  // Add random stat bonuses based on CR/2 (rounded up)
-  const bonusPoints = Math.ceil(cr / 2);
-  const statKeys = Object.keys(stats);
+    // Determine the primary stat based on specialty
+    const primaryStat = {
+        Ninjutsu: 'int',
+        Bukijutsu: 'dex',
+        Genjutsu: 'wis',
+        Taijutsu: 'str',
+        Fuinjutsu: 'int',
+    }[specialty];
 
-  for (let i = 0; i < bonusPoints; i++) {
-    const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
-    stats[randomStat] += 1;
-  }
+    // Add random stat bonuses based on CR/2 (rounded up)
+    const bonusPoints = Math.ceil(cr / 2);
+    const statKeys = Object.keys(stats);
 
-  return stats;
+    // Ensure the primary stat is the highest
+    for (let i = 0; i < bonusPoints; i++) {
+        stats[primaryStat] += 1;
+    }
+
+    // Sort stats in descending order
+    const sortedStats = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+
+    // Ensure the primary stat is the highest
+    if (sortedStats[0][0] !== primaryStat) {
+        const primaryStatIndex = sortedStats.findIndex(([key]) => key === primaryStat);
+        [sortedStats[0], sortedStats[primaryStatIndex]] = [sortedStats[primaryStatIndex], sortedStats[0]];
+    }
+
+    // Ensure Constitution is the second highest, or rarely Charisma
+    if (Math.random() < 0.1) { // 10% chance for Charisma to be second highest
+        const charismaIndex = sortedStats.findIndex(([key]) => key === 'cha');
+        if (charismaIndex > 1) {
+            [sortedStats[1], sortedStats[charismaIndex]] = [sortedStats[charismaIndex], sortedStats[1]];
+        }
+    } else {
+        const conIndex = sortedStats.findIndex(([key]) => key === 'con');
+        if (conIndex > 1) {
+            [sortedStats[1], sortedStats[conIndex]] = [sortedStats[conIndex], sortedStats[1]];
+        }
+    }
+
+    // Convert back to an object
+    const finalStats = sortedStats.reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+
+    return finalStats;
 }
 
 export function calculateModifier(score: number): number {
@@ -527,97 +562,94 @@ export function getClanFeatures(clan: NinjaClan, level: number): string[] {
 }
 
 export function generateCharacter(
-  clan: NinjaClan,
-  rank: NinjaRank,
-  chakraNatures: ChakraNature[],
-  specialty: NinjaSpecialty
+    clan: NinjaClan,
+    rank: NinjaRank,
+    chakraNatures: ChakraNature[],
+    specialty: NinjaSpecialty
 ): NinjaCharacter {
-  const [minCR, maxCR] = CR_RANGES[rank];
-  const cr = Math.floor(Math.random() * (maxCR - minCR + 1)) + minCR;
-  
-  // Determine initial rank based on CR
-  let actualRank: NinjaRank;
-  if (cr <= 4) actualRank = 'Genin';
-  else if (cr <= 8) actualRank = 'Chunin';
-  else if (cr <= 12) actualRank = 'Jonin';
-  else if (cr <= 16) actualRank = 'ANBU';
-  else actualRank = 'Kage';
+    const [minCR, maxCR] = CR_RANGES[rank];
+    const cr = Math.floor(Math.random() * (maxCR - minCR + 1)) + minCR;
 
-  const stats = generateStats(cr); // Pass cr as an argument
-  const modifiers = Object.entries(stats).reduce(
-    (acc, [key, value]) => ({
-      ...acc,
-      [key]: calculateModifier(value),
-    }),
-    {}
-  );
-  const proficiencyBonus = Math.floor((cr - 1) / 4) + 2;
-  const level = Math.floor((cr + 1) / 2);
+    // Determine initial rank based on CR
+    let actualRank: NinjaRank;
+    if (cr <= 4) actualRank = 'Genin';
+    else if (cr <= 8) actualRank = 'Chunin';
+    else if (cr <= 12) actualRank = 'Jonin';
+    else if (cr <= 16) actualRank = 'ANBU';
+    else actualRank = 'Kage';
 
-  const conMod = modifiers.con;
-  const baseHP = Array(cr)
-    .fill(0)
-    .map(() => rollDice(12))
-    .reduce((a, b) => a + b, 0);
-  const totalHP = baseHP + conMod * cr + 10 + conMod;
+    const stats = generateStats(cr, specialty); // Pass specialty as an argument
+    const modifiers = Object.entries(stats).reduce(
+        (acc, [key, value]) => ({ ...acc, [key]: calculateModifier(value), }),
+        {}
+    );
+    const proficiencyBonus = Math.floor((cr - 1) / 4) + 2;
+    const level = Math.floor((cr + 1) / 2);
 
-  const baseChakra = Array(cr)
-    .fill(0)
-    .map(() => rollDice(12))
-    .reduce((a, b) => a + b, 0);
-  const totalChakra = baseChakra + conMod * cr + 10 + conMod;
+    const conMod = modifiers.con;
+    const baseHP = Array(cr)
+        .fill(0)
+        .map(() => rollDice(12))
+        .reduce((a, b) => a + b, 0);
+    const totalHP = baseHP + conMod * cr + 10 + conMod;
 
-  // Calculate attack modifiers and save DCs
-  const attackMods = {
-    ninjutsu: proficiencyBonus + modifiers.int,
-    taijutsu: proficiencyBonus + modifiers.str,
-    genjutsu: proficiencyBonus + modifiers.wis
-  };
+    const baseChakra = Array(cr)
+        .fill(0)
+        .map(() => rollDice(12))
+        .reduce((a, b) => a + b, 0);
+    const totalChakra = baseChakra + conMod * cr + 10 + conMod;
 
-  const saveDCs = {
-    ninjutsu: 8 + proficiencyBonus + modifiers.int,
-    taijutsu: 8 + proficiencyBonus + modifiers.str,
-    genjutsu: 8 + proficiencyBonus + modifiers.wis
-  };
+    // Calculate attack modifiers and save DCs
+    const attackMods = {
+        ninjutsu: proficiencyBonus + modifiers.int,
+        taijutsu: proficiencyBonus + modifiers.str,
+        genjutsu: proficiencyBonus + modifiers.wis
+    };
 
-  // Generate 1-3 weapons
-  const weapons = Array(rollDice(3))
-    .fill(0)
-    .map(() => generateWeapon());
+    const saveDCs = {
+        ninjutsu: 8 + proficiencyBonus + modifiers.int,
+        taijutsu: 8 + proficiencyBonus + modifiers.str,
+        genjutsu: 8 + proficiencyBonus + modifiers.wis
+    };
 
-  // Get clan-specific jutsu
-  const clanJutsu = getClanJutsu(clan, rank);
+    // Generate 1-3 weapons
+    const weapons = Array(rollDice(3))
+        .fill(0)
+        .map(() => generateWeapon(cr));
 
-  // Get general jutsu based on rank, specialty, and elements
-  const generalJutsu = getJutsuFromLibrary(rank, specialty, chakraNatures);
+    // Get clan-specific jutsu
+    const clanJutsu = getClanJutsu(clan, rank);
 
-  // Combine clan jutsu with general jutsu
-  const jutsu = [...clanJutsu, ...generalJutsu];
+    // Get general jutsu based on rank, specialty, and elements
+    const generalJutsu = getJutsuFromLibrary(rank, specialty, chakraNatures);
 
-  // Get clan features
-  const abilities = getClanFeatures(clan, level);
+    // Combine clan jutsu with general jutsu
+    const jutsu = [...clanJutsu, ...generalJutsu];
 
-  return {
-    name: `${clan} ${rank}`,
-    clan,
-    rank: actualRank,
-    cr,
-    xp: XP_BY_CR[cr],
-    chakraNatures,
-    specialty,
-    stats,
-    modifiers,
-    hp: totalHP,
-    maxHp: totalHP,
-    chakra: totalChakra,
-    maxChakra: totalChakra,
-    ac: 11 + Math.floor((stats.dex - 10) / 2) + cr + 3,
-    speed: 30,
-    attackMods,
-    saveDCs,
-    jutsu,
-    weapons,
-    abilities,
-    proficiencyBonus,
-  };
+    // Get clan features
+    const abilities = getClanFeatures(clan, level);
+
+    return {
+        name: `${clan} ${rank}`,
+        clan,
+        rank: actualRank,
+        cr,
+        xp: XP_BY_CR[cr],
+        chakraNatures,
+        specialty,
+        stats,
+        modifiers,
+        hp: totalHP,
+        maxHp: totalHP,
+        chakra: totalChakra,
+        maxChakra: totalChakra,
+        ac: 11 + Math.floor((stats.dex - 10) / 2) + cr + 3,
+        speed: 30,
+        attackMods,
+        saveDCs,
+        jutsu,
+        weapons,
+        abilities,
+        proficiencyBonus,
+    };
 }
