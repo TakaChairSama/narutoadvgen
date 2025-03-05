@@ -299,17 +299,13 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
 
     // Ensure all stats except the primary stat have values
     for (const stat of statNames) {
-        if (stat !== primaryStatKey && !(stat in finalStats)) {
-            let newValue;
-            do {
-                const rolls = Array.from({ length: 4 }, () => rollDice(6));
-                const sum = rolls.sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
-                newValue = Math.max(sum, 8);
-            } while (Object.values(finalStats).includes(newValue)); // Ensure it's unique
-
-            finalStats[stat] = newValue; // Assign the new value
-        }
+    if (stat !== primaryStatKey && !(stat in finalStats)) {
+        const rolls = Array.from({ length: 4 }, () => rollDice(6));
+        const sum = rolls.sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
+        const newValue = Math.max(sum, 8);
+        finalStats[stat] = newValue;
     }
+}
 
     // Create an ordered stats object
     const orderedStats: Record<string, number> = {};
