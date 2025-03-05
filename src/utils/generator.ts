@@ -268,9 +268,16 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     const finalStats: Record<string, number> = {};
     finalStats[primaryStatKey] = pairedStats[0].value; // Assign highest to primary stat
 
-    // Assign the remaining values to the other stats
-    for (const { stat, value } of pairedStats) {
-        if (stat !== primaryStatKey && !finalStats[stat]) { // Check if stat is NOT primary and NOT already assigned
+    // Shuffle the remaining values
+    const remainingStats = pairedStats.slice(1); // Exclude the primary stat
+    for (let i = remainingStats.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [remainingStats[i], remainingStats[j]] = [remainingStats[j], remainingStats[i]]; // Swap
+    }
+
+    // Assign the remaining values to the other stats in the shuffled order
+    for (const { stat, value } of remainingStats) {
+        if (stat !== primaryStatKey && !finalStats[stat]) {
             finalStats[stat] = value;
         }
     }
