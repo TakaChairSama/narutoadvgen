@@ -251,39 +251,40 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
         Fuinjutsu: 'int',
     }[specialty];
 
-    // Add random stat bonuses based on CR/2 (rounded up)
-    const bonusPoints = Math.ceil(cr / 2);
-    const statKeys = Object.keys(stats);
-
-    // Ensure the primary stat is the highest
-    for (let i = 0; i < bonusPoints; i++) {
-        stats[primaryStat] += 1;
-    }
-
+    // Create an array of stats to sort and find the highest and second highest
+    const statEntries = Object.entries(stats);
+    
     // Sort stats in descending order
-    const sortedStats = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+    const sortedStats = statEntries.sort((a, b) => b[1] - a[1]);
 
-    // Ensure the primary stat is the highest
-    if (sortedStats[0][0] !== primaryStat) {
-        const primaryStatIndex = sortedStats.findIndex(([key]) => key === primaryStat);
-        [sortedStats[0], sortedStats[primaryStatIndex]] = [sortedStats[primaryStatIndex], sortedStats[0]];
-    }
+    // Prepare final stats object
+    const finalStats = {
+        [primaryStat]: 0, // Initialize primary stat
+    };
 
-    // Ensure Constitution is the second highest, or rarely Charisma
+    // Assign the highest stat to primaryStat
+    finalStats[primaryStat] = stats[primaryStat];
+
+    // Assign the second highest stat (Constitution or Charisma)
+    const secondHighestStat = sortedStats[1][0]; // Get the key of the second highest stat
+    finalStats[secondHighestStat] = stats[secondHighestStat];
+
+    // Randomly assign the rest of the stats
+    const remainingStats = sortedStats.slice(2).map(([key]) => key);
+    
+    // Assign values to the remaining stats
+    remainingStats.forEach(stat => {
+        finalStats[stat] = stats[stat];
+    });
+
+    // Ensure Charisma has a 10% chance to be higher than Constitution
     if (Math.random() < 0.1) { // 10% chance for Charisma to be second highest
-        const charismaIndex = sortedStats.findIndex(([key]) => key === 'cha');
-        if (charismaIndex > 1) {
-            [sortedStats[1], sortedStats[charismaIndex]] = [sortedStats[charismaIndex], sortedStats[1]];
-        }
-    } else {
-        const conIndex = sortedStats.findIndex(([key]) => key === 'con');
-        if (conIndex > 1) {
-            [sortedStats[1], sortedStats[conIndex]] = [sortedStats[conIndex], sortedStats[1]];
-        }
+        finalStats.cha = Math.max(finalStats.cha, finalStats.con);
     }
 
-    // Convert back to an object
-    const finalStats = sortedStats.reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+    // Add random stat bonuses based on CR/2 (rounded up) only to the primary stat
+    const bonusPoints = Math.ceil(cr / 2);
+    finalStats[primaryStat] += bonusPoints;
 
     return finalStats;
 }
