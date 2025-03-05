@@ -94,6 +94,7 @@ function JutsuDetails({ jutsu }: JutsuDetailsProps) {
 
 function App() {
   const [character, setCharacter] = useState<NinjaCharacter | null>(null);
+  const [characterName, setCharacterName] = useState<string>('');
   const [selectedClan, setSelectedClan] = useState<NinjaClan>('None');
   const [selectedRank, setSelectedRank] = useState<NinjaRank>('Genin');
   const [selectedNatures, setSelectedNatures] = useState<ChakraNature[]>([]);
@@ -142,6 +143,7 @@ function App() {
       selectedNatures,
       selectedSpecialty
     );
+    setCharacterName(newCharacter.name);
     setCurrentHp(newCharacter.hp);
     setCurrentChakra(newCharacter.chakra);
     setCharacter(newCharacter);
@@ -149,7 +151,7 @@ function App() {
 
   const handleExport = () => {
     if (character) {
-      const serialized = serializeCharacter(character);
+      const serialized = serializeCharacter({ ...character, name: characterName });
       setExportedCharacter(serialized);
     }
   };
@@ -157,6 +159,7 @@ function App() {
   const handleImport = () => {
     const deserialized = deserializeCharacter(importedCharacter);
     if (deserialized) {
+      setCharacterName(deserialized.name);
       setCharacter(deserialized);
       setCurrentHp(deserialized.hp);
       setCurrentChakra(deserialized.chakra);
@@ -406,7 +409,13 @@ function App() {
 
               <div className="space-y-4">
                 <div className="border-b pb-4">
-                  <h3 className="text-lg font-medium">{character.name}</h3>
+                  <input
+                    type="text"
+                    value={characterName}
+                    onChange={(e) => setCharacterName(e.target.value)}
+                    className="text-lg font-medium w-full bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-1"
+                    placeholder="Enter character name..."
+                  />
                   <p className="text-gray-600">
                     LVL {character.cr} • {character.rank.replace(/^(\w+)$/, '$1 Tier')} ({character.xp} XP)
                   </p>
