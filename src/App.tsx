@@ -201,6 +201,9 @@ function App() {
       updatedStats[statToIncrease] += 0.5;
     }
 
+    // Increase Constitution regardless of specialty
+    updatedStats.con += 0.5;
+
     // Calculate new modifiers
     const updatedModifiers = Object.entries(updatedStats).reduce(
       (acc, [key, value]) => ({
