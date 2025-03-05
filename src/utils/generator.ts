@@ -298,18 +298,7 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     finalStats[primaryStatKey] += bonusPoints;
 
         // Ensure all stats except the primary stat have values
-    for (const stat of statNames) {
-        if (stat !== primaryStatKey && !(stat in finalStats)) {
-            let newValue;
-            do {
-                const rolls = Array.from({ length: 4 }, () => rollDice(6));
-                const sum = rolls.sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
-                newValue = Math.max(sum, 8);
-            } while (Object.values(finalStats).includes(newValue)); // Ensure it's unique
-
-            finalStats[stat] = newValue; // Assign the new value
-        }
-    }
+    
 
   const orderedStats: Record<string, number> = {};
     const standardStatOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
