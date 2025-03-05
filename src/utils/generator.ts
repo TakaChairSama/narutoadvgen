@@ -227,7 +227,7 @@ export function rollDice(sides: number): number {
 }
 
 export function generateStats(cr: number, specialty: NinjaSpecialty): Record<string, number> {
-    // Determine the primary stat based on specialty using if statements
+    // Determine the primary stat based on specialty
     let primaryStatKey: string;
     if (specialty === 'Ninjutsu') {
         primaryStatKey = 'int';
@@ -297,7 +297,7 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     const bonusPoints = Math.ceil(cr / 2);
     finalStats[primaryStatKey] += bonusPoints;
 
-        // Ensure all stats except the primary stat have values
+    // Ensure all stats except the primary stat have values
     for (const stat of statNames) {
         if (stat !== primaryStatKey && !(stat in finalStats)) {
             let newValue;
@@ -311,8 +311,14 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
         }
     }
 
-    return finalStats;
-}
+    // Create an ordered stats object
+    const orderedStats: Record<string, number> = {};
+    const standardStatOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+    for (const stat of standardStatOrder) {
+        orderedStats[stat] = finalStats[stat] || 0; // Default to 0 if stat is missing
+    }
+
+    return orderedStats }
 
 export function calculateModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -655,10 +661,6 @@ export function generateCharacter(
     // Get clan features
     const abilities = getClanFeatures(clan, level);
 
-    // Assuming finalStats is already populated with the generated stats
-const standardStatOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha']; 
-const orderedStats = Object.fromEntries(standardStatOrder.map(stat => [stat, finalStats[stat]]));
-
 // Return the final object with stats in the standard order
 return {
     name: `${clan} ${rank}`,
@@ -668,7 +670,7 @@ return {
     xp: XP_BY_CR[cr],
     chakraNatures,
     specialty,
-    stats: orderedStats, // Use the ordered stats here
+    stats,
     modifiers,
     hp: totalHP,
     maxHp: totalHP,
