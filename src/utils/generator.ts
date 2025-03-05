@@ -244,18 +244,33 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     }
 
     // Roll stats for all attributes
-    const rolledValues = Array.from({ length: 6 }, () => {
-        const rolls = Array(4)
-            .fill(0)
-            .map(() => rollDice(6));
-        const sum = rolls
-            .sort((a, b) => b - a)
-            .slice(0, 3)
-            .reduce((a, b) => a + b, 0);
-        return Math.max(sum, 8); // Set minimum stat value to 8
-    });
+    const rollDice = (sides: number): number => {
+  return Math.floor(Math.random() * sides) + 1;
+};
+
+const rolledValues = (() => {
+  const values: number[] = [];
+  while (values.length < 6) {
+    const rolls = Array(4)
+      .fill(0)
+      .map(() => rollDice(6));
+    const sum = rolls
+      .sort((a, b) => b - a)
+      .slice(0, 3)
+      .reduce((a, b) => a + b, 0);
+    const value = Math.max(sum, 8);
+
+    if (!values.includes(value)) {
+      values.push(value);
+    }
+  }
+  return values;
+})();
 
    // Create an array of stat names
+    const statNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+
+    // Create an array of stat names
     const statNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
     // Pair rolled values with stat names
@@ -266,10 +281,11 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
 
     // Assign the highest value to the primary stat
     const finalStats: Record<string, number> = {};
-    finalStats[primaryStatKey] = pairedStats[0].value; // Assign highest to primary stat
+    const primaryStatValue = pairedStats[0].value;
+    finalStats[primaryStatKey] = primaryStatValue;
 
-    // Shuffle the remaining values
-    const remainingStats = pairedStats.slice(1); // Exclude the primary stat
+    // Shuffle the remaining values (excluding the primary stat's value)
+    const remainingStats = pairedStats.filter(({ value }) => value !== primaryStatValue);
     for (let i = remainingStats.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [remainingStats[i], remainingStats[j]] = [remainingStats[j], remainingStats[i]]; // Swap
