@@ -656,7 +656,7 @@ export function generateCharacter(
     const abilities = getClanFeatures(clan, level);
 
     // Assuming finalStats is already populated with the generated stats
-const standardStatOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+const standardStatOrder = ['str', 'dex', 'con', 'int', 'wis', 'cha']; 
 const orderedStats = Object.fromEntries(standardStatOrder.map(stat => [stat, finalStats[stat]]));
 
 // Return the final object with stats in the standard order
