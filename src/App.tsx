@@ -525,7 +525,7 @@ function App() {
                   {Object.entries(character.stats).map(([stat, value]) => (
                     <div key={stat} className="bg-gray-50 p-2 rounded">
                       <div className="text-sm text-gray-600 uppercase">
-                        {stat}
+                        {Math.floor(stat)}
                       </div>
                       <div className="font-bold">
                         {value} ({character.modifiers[stat] >= 0 ? '+' : ''}
