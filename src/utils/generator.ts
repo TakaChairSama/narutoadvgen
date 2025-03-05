@@ -326,14 +326,14 @@ export function generateWeapon(cr: number): Weapon {
 
   traits.forEach((trait) => {
     if (trait === 'Legendary') {
-      damageBonus += 2; // +2 damage for legendary weapons
+      damageBonus += 3; // +3 damage for legendary weapons
       additionalProperties.push('Critical'); // Add critical property
     } else if (trait === 'Ancient') {
       damageBonus += 1; // +1 damage for ancient weapons
     } else if (trait === 'Blessed') {
-      additionalProperties.push('Healing'); // Add healing property
+      additionalProperties.push('Healing (1/4 Damage)'); // Add healing property
     } else if (trait === 'Cursed') {
-      additionalProperties.push('Disadvantage on saving throws'); // Add curse effect
+      additionalProperties.push('Disadvantage on Saving Throws, Ignores Resistences'); // Add curse effect
     }
   });
 
@@ -611,7 +611,7 @@ export function generateCharacter(
     maxHp: totalHP,
     chakra: totalChakra,
     maxChakra: totalChakra,
-    ac: 10 + Math.floor((stats.dex - 10) / 2) + cr,
+    ac: 11 + Math.floor((stats.dex - 10) / 2) + cr + 3,
     speed: 30,
     attackMods,
     saveDCs,
