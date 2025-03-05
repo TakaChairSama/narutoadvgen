@@ -245,29 +245,29 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
 
     // Roll stats for all attributes
     const rollDice = (sides: number): number => {
-  return Math.floor(Math.random() * sides) + 1;
-};
+        return Math.floor(Math.random() * sides) + 1;
+    };
 
-const rolledValues = (() => {
-  const values: number[] = [];
-  while (values.length < 6) {
-    const rolls = Array(4)
-      .fill(0)
-      .map(() => rollDice(6));
-    const sum = rolls
-      .sort((a, b) => b - a)
-      .slice(0, 3)
-      .reduce((a, b) => a + b, 0);
-    const value = Math.max(sum, 8);
+    const rolledValues = (() => {
+        const values: number[] = [];
+        while (values.length < 6) {
+            const rolls = Array(4)
+                .fill(0)
+                .map(() => rollDice(6));
+            const sum = rolls
+                .sort((a, b) => b - a)
+                .slice(0, 3)
+                .reduce((a, b) => a + b, 0);
+            const value = Math.max(sum, 8);
 
-    if (!values.includes(value)) {
-      values.push(value);
-    }
-  }
-  return values;
-})();
+            if (!values.includes(value)) {
+                values.push(value);
+            }
+        }
+        return values;
+    })();
 
-   // Create an array of stat names
+    // Create an array of stat names
     const statNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
     // Pair rolled values with stat names
@@ -290,14 +290,33 @@ const rolledValues = (() => {
 
     // Assign the remaining values to the other stats in the shuffled order
     for (const { stat, value } of remainingStats) {
-        if (stat !== primaryStatKey && !finalStats[stat]) {
-            finalStats[stat] = value;
-        }
+        finalStats[stat] = value;
     }
 
     // Add random stat bonuses based on CR/2 (rounded up) only to the primary stat
     const bonusPoints = Math.ceil(cr / 2);
     finalStats[primaryStatKey] += bonusPoints;
+
+    // Ensure all six stats have values
+    const allStatNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+    for (const stat of allStatNames) {
+        if (!(stat in finalStats)) {
+            // Roll for the missing stat
+            let newValue;
+            do {
+                const rolls = Array(4)
+                    .fill(0)
+                    .map(() => rollDice(6));
+                const sum = rolls
+                    .sort((a, b) => b - a)
+                    .slice(0, 3)
+                    .reduce((a, b) => a + b, 0);
+                newValue = Math.max(sum, 8);
+            } while (Object.values(finalStats).includes(newValue)); // Ensure it's unique
+
+            finalStats[stat] = newValue; // Assign the new value
+        }
+    }
 
     return finalStats;
 }
