@@ -237,7 +237,7 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
     }[specialty];
 
     // Roll stats for all attributes
-    const stats = ['str', 'dex', 'con', 'int', 'wis', 'cha'].reduce((acc, stat) => {
+    const rolledStats = ['str', 'dex', 'con', 'int', 'wis', 'cha'].map(stat => {
         const rolls = Array(4)
             .fill(0)
             .map(() => rollDice(6));
@@ -245,20 +245,32 @@ export function generateStats(cr: number, specialty: NinjaSpecialty): Record<str
             .sort((a, b) => b - a)
             .slice(0, 3)
             .reduce((a, b) => a + b, 0);
-        
-        // Assign the highest rolled value to the primary stat
-        if (stat === primaryStatKey) {
-            return { ...acc, [stat]: Math.max(sum, acc[stat] || 0) }; // Ensure primary stat gets the highest value
-        }
-        
-        return { ...acc, [stat]: sum };
-    }, {});
+        return { stat, value: sum };
+    });
+
+    // Sort rolled stats from highest to lowest
+    rolledStats.sort((a, b) => b.value - a.value);
+
+    // Assign the highest value to the primary stat
+    const finalStats: Record<string, number> = {};
+    finalStats[primaryStatKey] = rolledStats[0].value; // Assign highest to primary stat
+
+    // Remove the assigned primary stat from the rolled stats
+    rolledStats.shift(); // Remove the first element (highest)
+
+    // Randomize the remaining stats
+    const remainingStats = rolledStats.sort(() => Math.random() - 0.5); // Shuffle the remaining stats
+
+    // Assign the remaining values to the other stats
+    remainingStats.forEach(({ stat, value }) => {
+        finalStats[stat] = value;
+    });
 
     // Add random stat bonuses based on CR/2 (rounded up) only to the primary stat
     const bonusPoints = Math.ceil(cr / 2);
-    stats[primaryStatKey] += bonusPoints;
+    finalStats[primaryStatKey] += bonusPoints;
 
-    return stats;
+    return finalStats;
 }
 
 export function calculateModifier(score: number): number {
