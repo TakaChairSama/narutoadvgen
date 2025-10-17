@@ -1,95 +1,34 @@
-/* Chakra Weapons Library
-   - Parses the provided raw list (from pasted.txt) and exports a searchable library.
-   - Only blocks that are weapons are included (e.g., "Weapon (...)" headers and known weapon-like entries).
+/* Chakra Items Library (weapons + tools + armor + artifacts, parsed from pasted2.txt)
+   - Parses EVERY entry from your pasted2.txt, including non-weapons, into a structured list.
+   - Robust header detection handles:
+     * Standard headers: "Weapon (...), Rank", "Ninja Tool, Rank", "Armor (...), Rank", "Ring, Rank", "Scroll, Rank", "Pill, Rank", "Potion, Rank", "Staff, Rank", "Rod, Rank", "Artifact, Rank", "Wondrous item, Rank"
+     * Nonstandard headers used by Gunbai/Seven Swords, e.g. "Heavy, Two-Handed. Reach 1, A-rank ..."
+   - Exports helpers compatible with previous usage:
+     * CHAKRA_WEAPON_LIST (all parsed items)
+     * CHAKRA_WEAPON_MAP (by name)
+     * CHAKRA_WEAPON_NAMES (names)
+     * getChakraWeaponByName(name)
+     * searchChakraWeapons(query)
 */
 
 export interface ChakraWeapon {
   name: string;
-  type?: string;        // e.g., "Katana", "any sword", "Tanto"
-  rank?: string;        // "E-Rank"..."S-Rank"
+  // High-level category: Weapon | Armor | Ninja Tool | Pill | Potion | Ring | Scroll | Staff | Rod | Artifact | Wondrous item | Unknown
+  category?: string;
+  // Specific type like "Tanto", "Any Sword", "Longbow", etc. (for Weapon) or additional header info for other categories
+  type?: string;
+  // E/D/C/B/A/S-Rank, "Legendary", or free-form when present
+  rank?: string;
   attunement?: boolean;
   attunementText?: string;
+  // The full descriptive text of the entry
   description: string;
+  // Raw header as found on line 2 (useful for debugging/search)
+  header?: string;
 }
 
-// Heuristic parser for the pasted list
-function parseChakraWeaponsLibrary(text: string): Record<string, ChakraWeapon> {
-  // Split into logical blocks separated by double newlines
-  const blocks = text
-    .split(/\n{2,}/g)
-    .map((b) => b.trim())
-    .filter(Boolean);
-
-  const lib: Record<string, ChakraWeapon> = {};
-
-  const weaponHeaderRegex = /^Weapon\b/i;
-  const headerRankRegex =
-    /\b([ESABCD])\s*-\s*Rank\b|\b([ESABCD])\s*rank\b|\b([ESABCD])\s*-\s*rank\b/i;
-  const typeRegex = /Weapon\s*\(([^)]+)\)/i;
-
-  for (const block of blocks) {
-    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
-    if (lines.length < 2) continue;
-
-    const name = lines[0];
-    const header = lines[1];
-
-    // Determine if this block is a "weapon"
-    const isWeapon =
-      weaponHeaderRegex.test(header) ||
-      /Weapon\s*\(/i.test(header) ||
-      /Gunbai\s+Uchiwa/i.test(name) ||
-      /Seven Ninja Swords/i.test(name) ||
-      /Odachi/i.test(header) ||
-      /Tanto/i.test(header) ||
-      /Tetsubo/i.test(header) ||
-      /Broadsword/i.test(header) ||
-      /Katana/i.test(header) ||
-      /Trident|Greataxe|Battleaxe|Sword|Longbow/i.test(header);
-
-    if (!isWeapon) continue;
-
-    // Extract type if present
-    let type: string | undefined;
-    const typeMatch = header.match(typeRegex);
-    if (typeMatch) type = typeMatch[1].trim();
-
-    // Extract rank symbol
-    let rank: string | undefined;
-    const rankMatch = header.match(headerRankRegex);
-    if (rankMatch) {
-      const r = (rankMatch[1] || rankMatch[2] || rankMatch[3] || '').toUpperCase();
-      if (['E', 'D', 'C', 'B', 'A', 'S'].includes(r)) {
-        rank = `${r}-Rank`;
-      }
-    } else {
-      const alt = header.match(/\b([ESABCD])\s*-?\s*rank\b/i);
-      if (alt) {
-        const r = (alt[1] || '').toUpperCase();
-        if (['E', 'D', 'C', 'B', 'A', 'S'].includes(r)) rank = `${r}-Rank`;
-      }
-    }
-
-    // Attunement
-    const attunement = /requires\s+attunement/i.test(header);
-
-    const description = lines.slice(2).join('\n').trim();
-
-    lib[name] = {
-      name,
-      type,
-      rank,
-      attunement,
-      attunementText: attunement ? 'Requires attunement' : undefined,
-      description,
-    };
-  }
-
-  return lib;
-}
-
-// Raw pasted list (only weapon entries will be extracted)
-const RAW_TEXT = `Armor of Gleaming
+// Raw text copied 1:1 from pasted2.txt. Do not edit unless updating the source list.
+const RAW_TEXT = String.raw`Armor of Gleaming
 Armor (any medium or heavy), E-Rank
 This armor never gets dirty.
 Pill of Nourishment
@@ -721,28 +660,231 @@ Kiba
 Tanto, S-rank (Requires Attunement)
 You gain a +3 bonus to attack and damage rolls made with these weapons. Both blades count as one attunement slot. They have the following additional properties:
 Thunderswords: While attuned to Kiba the user gains the Lighting Affinity. Reduce the cost of all Lightning Jutsu by 2(minimum of 1 chakra cost) and all Lightning Jutsu cast while Kiba is drawn loses the Hand Seals requirement. Furthermore, when a Lighting Jutsu would deal damage you may add your Ninjutsu Ability Modifier to the damage.
-Thunderbolt: You may cast Lighting Release: Lighting Spear from Kiba once per Full Rest.`;
+Thunderbolt: You may cast Lighting Release: Lighting Spear from Kiba once per Full Rest.
+`;
 
-const CHAKRA_WEAPON_MAP_INTERNAL = parseChakraWeaponsLibrary(RAW_TEXT);
+// Helpers: parsing
+const RANK_REGEX =
+  /\b(E|D|C|B|A|S)\s*-\s*Rank\b|\b(E|D|C|B|A|S)\s*rank\b|\b(E|D|C|B|A|S)-rank\b|\blegendary\b/i;
+const ATTUNE_REGEX = /\(?\s*requires\s+attunement[^)]*\)?/i;
 
-// Exported API
-export const CHAKRA_WEAPON_MAP: Record<string, ChakraWeapon> = CHAKRA_WEAPON_MAP_INTERNAL;
-export const CHAKRA_WEAPON_LIST: ChakraWeapon[] = Object.values(CHAKRA_WEAPON_MAP_INTERNAL).sort(
-  (a, b) => a.name.localeCompare(b.name)
+// If the header starts with one of these tokens, treat it as a header.
+const HEADER_STARTERS = [
+  'weapon',
+  'armor',
+  'ninja tool',
+  'potion',
+  'pill',
+  'ring',
+  'rod',
+  'staff',
+  'scroll',
+  'artifact',
+  'wondrous item',
+  // Nonstandard headers (Gunbai etc.)
+  'heavy',
+  'odachi',
+  'katana',
+  'broadsword',
+  'greataxe',
+  'trident',
+];
+
+function normalize(str: string): string {
+  return str.trim().replace(/\s+/g, ' ');
+}
+
+function isHeaderLine(line: string): boolean {
+  const l = line.trim();
+  if (!l) return false;
+  // Typical: contains a rank marker or starts with a known category
+  const startsOk = HEADER_STARTERS.some((h) => l.toLowerCase().startsWith(h));
+  const hasRank = RANK_REGEX.test(l);
+  // Many headers have commas/parentheses describing type
+  const looksDescriptive = /,|[\(\)]|\breach\b|\bhanded\b/i.test(l);
+  return startsOk || hasRank || looksDescriptive;
+}
+
+function parseHeader(header: string): {
+  category?: string;
+  type?: string;
+  rank?: string;
+  attunement?: boolean;
+  attunementText?: string;
+} {
+  const h = header.trim();
+
+  // Category and type
+  let category: string | undefined;
+  let type: string | undefined;
+
+  // Weapon (Type)
+  let m = h.match(/^Weapon\s*\(([^)]+)\)\s*,?/i);
+  if (m) {
+    category = 'Weapon';
+    type = normalize(m[1]);
+  } else {
+    // Armor (Type)
+    m = h.match(/^Armor\s*\(([^)]+)\)\s*,?/i);
+    if (m) {
+      category = 'Armor';
+      type = normalize(m[1]);
+    } else {
+      // Scroll, Ring, Staff, Rod, Pill, Potion, Ninja Tool, Artifact, Wondrous item
+      const simple = h.match(/^(Weapon|Armor|Ninja Tool|Potion|Pill|Ring|Rod|Staff|Scroll|Artifact|Wondrous item)\b/i);
+      if (simple) {
+        category = normalize(simple[1]);
+        // If it contains (...) capture as type
+        const t = h.match(/\(([^)]+)\)/);
+        if (t) type = normalize(t[1]);
+      } else {
+        // Nonstandard (e.g., "Heavy, Two-Handed. Reach 1, A-rank (...)")
+        // Treat as Weapon-like entry when it includes “handed/reach” or known blade names elsewhere
+        if (/\b(handed|reach|odachi|katana|broadsword|greataxe|trident)\b/i.test(h)) {
+          category = 'Weapon';
+          type = normalize(h.replace(/\s*,?\s*[ESABCD]-rank.*$/i, ''));
+        } else {
+          category = 'Unknown';
+          type = undefined;
+        }
+      }
+    }
+  }
+
+  // Rank
+  let rank: string | undefined;
+  const r = h.match(RANK_REGEX);
+  if (r) {
+    const letter = (r[1] || r[2] || r[3] || '').toUpperCase();
+    if (letter) {
+      rank = `${letter}-Rank`;
+    } else if (/legendary/i.test(r[0])) {
+      rank = 'Legendary';
+    }
+  }
+
+  // Attunement
+  let attunement: boolean | undefined;
+  let attunementText: string | undefined;
+  const a = h.match(ATTUNE_REGEX);
+  if (a) {
+    attunement = true;
+    attunementText = normalize(a[0]).replace(/^\(|\)$/g, '');
+  }
+
+  return { category, type, rank, attunement, attunementText };
+}
+
+function parseAllItemsFromRaw(raw: string): ChakraWeapon[] {
+  const lines = raw.split(/\r?\n/);
+  const items: ChakraWeapon[] = [];
+
+  let i = 0;
+  while (i < lines.length) {
+    // Skip blanks
+    while (i < lines.length && !lines[i].trim()) i++;
+    if (i >= lines.length) break;
+
+    const name = normalize(lines[i] || '');
+    const possibleHeader = normalize(lines[i + 1] || '');
+
+    // We only start a block if there is a plausible header line immediately after name
+    if (!name || !possibleHeader || !isHeaderLine(possibleHeader)) {
+      // Not a block; advance one line
+      i++;
+      continue;
+    }
+
+    const header = possibleHeader;
+    i += 2; // move past name and header
+
+    const descLines: string[] = [];
+    // Accumulate description until we encounter another name+header pair
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // Peek next two lines to determine next block
+      const peekName = normalize(lines[i] || '');
+      const peekHeader = normalize(lines[i + 1] || '');
+      const looksNextBlock =
+        !!peekName &&
+        !!peekHeader &&
+        peekName.length > 0 &&
+        isHeaderLine(peekHeader) &&
+        // Heuristic: block names are usually shortish (but allow long names too)
+        // More importantly, ensure we don't misclassify long description paragraphs as header by
+        // requiring the candidate header to include either a rank token or category token
+        (RANK_REGEX.test(peekHeader) ||
+          /^(Weapon|Armor|Ninja Tool|Potion|Pill|Ring|Rod|Staff|Scroll|Artifact|Wondrous item)\b/i.test(
+            peekHeader
+          ) ||
+          /\b(handed|reach|odachi|katana|broadsword|greataxe|trident)\b/i.test(peekHeader));
+
+      if (looksNextBlock) {
+        break;
+      }
+
+      descLines.push(line);
+      i++;
+    }
+
+    const desc = normalize(descLines.join('\n').replace(/\n{3,}/g, '\n\n'));
+    const meta = parseHeader(header);
+
+    items.push({
+      name,
+      header,
+      description: desc,
+      ...meta,
+    });
+  }
+
+  // Deduplicate by name, keep first occurrence (in case of headings like section titles)
+  const seen = new Set<string>();
+  const deduped: ChakraWeapon[] = [];
+  for (const it of items) {
+    if (!it.name) continue;
+    if (seen.has(it.name)) continue;
+    seen.add(it.name);
+    deduped.push(it);
+  }
+  return deduped;
+}
+
+// Parse at module load
+export const CHAKRA_WEAPON_LIST: ChakraWeapon[] = parseAllItemsFromRaw(RAW_TEXT);
+
+// Map and helpers
+export const CHAKRA_WEAPON_MAP: Record<string, ChakraWeapon> = CHAKRA_WEAPON_LIST.reduce(
+  (acc, w) => {
+    acc[w.name] = w;
+    return acc;
+  },
+  {} as Record<string, ChakraWeapon>
 );
+
 export const CHAKRA_WEAPON_NAMES: string[] = CHAKRA_WEAPON_LIST.map((w) => w.name);
 
 export function getChakraWeaponByName(name: string): ChakraWeapon | undefined {
-  return CHAKRA_WEAPON_MAP[name] || undefined;
+  return CHAKRA_WEAPON_MAP[name];
 }
 
 export function searchChakraWeapons(query: string): ChakraWeapon[] {
   const q = query.trim().toLowerCase();
   if (!q) return CHAKRA_WEAPON_LIST;
-  return CHAKRA_WEAPON_LIST.filter(
-    (w) =>
-      w.name.toLowerCase().includes(q) ||
-      (w.type && w.type.toLowerCase().includes(q)) ||
-      (w.rank && w.rank.toLowerCase().includes(q))
-  );
+  return CHAKRA_WEAPON_LIST.filter((w) => {
+    const bucket = [
+      w.name,
+      w.category,
+      w.type,
+      w.rank,
+      w.attunementText,
+      w.header,
+      w.description,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return bucket.includes(q);
+  });
 }
