@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Scroll, Users, Plus, Upload, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Scroll, Users, Upload, X, Plus } from 'lucide-react';
 import type {
   ChakraNature,
   NinjaRank,
@@ -17,6 +17,12 @@ import {
 } from '../data/naruto';
 import { getJutsu as getJutsuFromLibrary } from '../data/jutsuLibrary';
 import { getClanFeatures, getClanJutsu, getJutsu } from '../utils/generator';
+import {
+  ChakraWeapon,
+  CHAKRA_WEAPON_NAMES,
+  getChakraWeaponByName,
+  searchChakraWeapons,
+} from '../data/chakraWeapons';
 
 // helpers
 const rollDice = (sides: number) => Math.floor(Math.random() * sides) + 1;
@@ -41,12 +47,12 @@ const specialtyStatKey = (spec: NinjaSpecialty): keyof Record<string, number> =>
   return 'int';
 };
 
-const ALLOWED_RANKS: Record<NinjaRank, Array<'D' | 'C' | 'B' | 'A' | 'S'>> = {
-  Genin: ['D'],
-  Chunin: ['D', 'C'],
-  Jonin: ['D', 'C', 'B'],
-  ANBU: ['D', 'C', 'B', 'A'],
-  Kage: ['D', 'C', 'B', 'A', 'S'],
+const ALLOWED_RANKS: Record<NinjaRank, Array<'E' | 'D' | 'C' | 'B' | 'A' | 'S'>> = {
+  Genin: ['E', 'D'],
+  Chunin: ['E', 'D', 'C'],
+  Jonin: ['E', 'D', 'C', 'B'],
+  ANBU: ['E', 'D', 'C', 'B', 'A'],
+  Kage: ['E', 'D', 'C', 'B', 'A', 'S'],
 };
 
 const generateStats = (cr: number) => {
@@ -81,7 +87,7 @@ interface NinjaCharacter {
   name: string;
   clan: NinjaClan | 'None';
   rank: NinjaRank;
-  cr: number; // stored as "Level" for UI
+  cr: number; // UI shows "Level"
   xp: number;
   chakraNatures: ChakraNature[];
   specialty: NinjaSpecialty;
@@ -94,14 +100,14 @@ interface NinjaCharacter {
   ac: number;
   speed: number;
   jutsu: JutsuType[];
-  clanFeatures: ClanFeature[]; // structured features for display
-  clanJutsu: JutsuType[]; // clan jutsu by rank
+  clanFeatures: ClanFeature[];
+  clanJutsu: JutsuType[];
   weapons: any[];
-  abilities: string[]; // clan features as strings (compat)
+  abilities: string[];
   proficiencyBonus: number;
-  // For reversible stat scaling by CR
   baseStats?: Record<string, number>;
   baseCR?: number;
+  chakraWeapons?: ChakraWeapon[];
 }
 
 const NinjaGenerator: React.FC = () => {
@@ -118,16 +124,20 @@ const NinjaGenerator: React.FC = () => {
   const [specialty, setSpecialty] = useState<NinjaSpecialty>(NINJA_SPECIALTIES[0]);
   const [customName, setCustomName] = useState('');
 
-  // Import UI
+  // Import character JSON UI
   const [importText, setImportText] = useState('');
   const [showImportArea, setShowImportArea] = useState(false);
 
-  // Per-character exported JSON preview
+  // Export cache per character
   const [exportedJsonById, setExportedJsonById] = useState<Record<string, string>>({});
 
   // HP/Chakra typed deltas
-  const [hpDelta, setHpDelta] = useState<string>(''); // applied to active character
-  const [chakraDelta, setChakraDelta] = useState<string>(''); // applied to active character
+  const [hpDelta, setHpDelta] = useState<string>('');
+  const [chakraDelta, setChakraDelta] = useState<string>('');
+
+  // Chakra weapon add UI
+  const [weaponQuery, setWeaponQuery] = useState('');
+  const [weaponResults, setWeaponResults] = useState<ChakraWeapon[]>([]);
 
   const handleNatureToggle = (nature: ChakraNature) => {
     setSelectedNatures((prev) =>
@@ -218,6 +228,7 @@ const NinjaGenerator: React.FC = () => {
       proficiencyBonus,
       baseStats: { ...stats },
       baseCR: cr,
+      chakraWeapons: [],
     };
 
     setCharacters((prev) => [...prev, newChar]);
@@ -230,7 +241,7 @@ const NinjaGenerator: React.FC = () => {
     if (activeTab === id) setActiveTab(characters[0]?.id || null);
   };
 
-  // Apply typed delta to HP (can exceed max and will be displayed as temp)
+  // Typed deltas
   const applyHpDelta = (id: string) => {
     const delta = Number(hpDelta || 0);
     if (!Number.isFinite(delta)) return;
@@ -240,7 +251,6 @@ const NinjaGenerator: React.FC = () => {
     setHpDelta('');
   };
 
-  // Apply typed delta to Chakra (can exceed max and will be displayed as temp)
   const applyChakraDelta = (id: string) => {
     const delta = Number(chakraDelta || 0);
     if (!Number.isFinite(delta)) return;
@@ -262,7 +272,7 @@ const NinjaGenerator: React.FC = () => {
     );
   };
 
-  // Import pasted JSON (top) and enrich
+  // Import pasted JSON (top) and enrich; includes optional chakra weapons
   const importFromText = async () => {
     if (!importText) return;
     try {
@@ -287,6 +297,7 @@ const NinjaGenerator: React.FC = () => {
         const seen = new Set<string>();
         const existing: JutsuType[] = Array.isArray(raw.jutsu) ? raw.jutsu : [];
         for (const j of [...existing, ...clanJutsuList]) {
+          if (!j?.name) continue;
           if (seen.has(j.name)) continue;
           seen.add(j.name);
           mergedJutsu.push(j);
@@ -306,6 +317,30 @@ const NinjaGenerator: React.FC = () => {
 
         // AC progression from imported Level
         const ac = 11 + (modifiers.dex ?? 0) + Math.floor(0.5 * cr) + 3;
+
+        // Optional: Chakra Weapons on the character (strings or objects)
+        let chakraWeapons: ChakraWeapon[] | undefined = undefined;
+        if (Array.isArray(raw.chakraWeapons)) {
+          chakraWeapons = raw.chakraWeapons
+            .map((cw: any) => {
+              if (typeof cw === 'string') {
+                const found = getChakraWeaponByName(cw);
+                if (found) return found;
+                return { name: cw, description: '' } as ChakraWeapon;
+              } else if (cw && typeof cw === 'object' && cw.name) {
+                const fromLib = getChakraWeaponByName(cw.name);
+                return {
+                  ...fromLib,
+                  ...cw,
+                  name: cw.name,
+                  description: cw.description ?? fromLib?.description ?? '',
+                } as ChakraWeapon;
+              }
+              return null;
+            })
+            .filter(Boolean) as ChakraWeapon[];
+          if (!chakraWeapons.length) chakraWeapons = undefined;
+        }
 
         const ch: NinjaCharacter = {
           id,
@@ -333,6 +368,7 @@ const NinjaGenerator: React.FC = () => {
           proficiencyBonus: Number(raw.proficiencyBonus || Math.floor((cr - 1) / 4) + 2),
           baseStats: raw.baseStats || { ...stats },
           baseCR: Number(raw.baseCR ?? cr),
+          chakraWeapons,
         };
 
         enriched.push(ch);
@@ -342,7 +378,7 @@ const NinjaGenerator: React.FC = () => {
       setActiveTab(enriched[enriched.length - 1].id);
       setImportText('');
       setShowImportArea(false);
-    } catch (err) {
+    } catch {
       alert('Failed to parse JSON. Ensure it is valid character JSON.');
     }
   };
@@ -357,11 +393,11 @@ const NinjaGenerator: React.FC = () => {
       await navigator.clipboard.writeText(json);
       alert('Character JSON copied to clipboard');
     } catch {
-      // If clipboard fails, user can copy from textarea
+      // Fallback: manual copy from textarea
     }
   };
 
-  // Level up/down core — recompute using new AC progression and Level language
+  // Level up/down core
   const applyCRChange = async (id: string, delta: 1 | -1) => {
     const current = characters.find((c) => c.id === id);
     if (!current) return;
@@ -391,7 +427,7 @@ const NinjaGenerator: React.FC = () => {
       Object.entries(newStats).map(([k, v]) => [k, calculateModifier(Math.floor(v))])
     ) as Record<string, number>;
 
-    // HP/Chakra change amount per level step (mirrors Level Up logic, reverses on down)
+    // HP/Chakra change per level step
     const hpStep = rollDice(12) + (newModifiers.con ?? 0);
     const chakraStep = rollDice(12) + (newModifiers.con ?? 0);
     const signedHp = delta === 1 ? hpStep : -hpStep;
@@ -411,20 +447,17 @@ const NinjaGenerator: React.FC = () => {
         ? getClanJutsu(current.clan as NinjaClan, newRank)
         : ([] as JutsuType[]);
 
-    // Filter non-clan jutsu to allowed ranks for the new rank
     const allowed = new Set(ALLOWED_RANKS[newRank]);
     const clanNames = new Set(newClanJutsu.map((j) => j.name));
     const filteredJutsu = current.jutsu.filter(
-      (j) => allowed.has(j.rank as any) || clanNames.has(j.name)
+      (j) => allowed.has((j.rank as any) || 'D') || clanNames.has(j.name)
     );
 
-    // On specific CRs when leveling up, add one specialty + one elemental jutsu if available
     let finalJutsu = [...filteredJutsu];
     if (delta === 1 && [5, 9, 13, 17].includes(newCR)) {
       const pool = getJutsu(newRank, current.specialty, current.chakraNatures);
       const existing = new Set(finalJutsu.map((j) => j.name));
 
-      // specialty candidates
       let specialtyCandidates = pool.filter((j) => j.keywords?.includes(current.specialty));
       if (current.specialty === 'Ninjutsu') {
         specialtyCandidates = specialtyCandidates.filter(
@@ -441,8 +474,6 @@ const NinjaGenerator: React.FC = () => {
       };
 
       addRandom(specialtyCandidates);
-
-      // elemental jutsu
       const elemental = pool.filter((j) => j.nature && current.chakraNatures.includes(j.nature));
       addRandom(elemental);
     }
@@ -452,7 +483,6 @@ const NinjaGenerator: React.FC = () => {
     for (const cj of newClanJutsu) {
       if (!afterNames.has(cj.name)) {
         finalJutsu.push(cj);
-        afterNames.add(cj.name);
       }
     }
 
@@ -484,7 +514,6 @@ const NinjaGenerator: React.FC = () => {
       clanFeatures: newStructuredFeatures,
       proficiencyBonus: prof,
       ac: newAC,
-      // persist base references
       baseStats: current.baseStats ?? { ...current.stats },
       baseCR: typeof current.baseCR === 'number' ? current.baseCR : current.cr,
     };
@@ -493,6 +522,37 @@ const NinjaGenerator: React.FC = () => {
   };
 
   const activeCharacter = characters.find((c) => c.id === activeTab);
+
+  // Chakra weapon search
+  const onSearchWeapons = (q: string) => {
+    setWeaponQuery(q);
+    setWeaponResults(searchChakraWeapons(q).slice(0, 10)); // top 10 suggestions
+  };
+
+  const addChakraWeaponToActive = (name: string) => {
+    const weapon = getChakraWeaponByName(name);
+    if (!weapon || !activeCharacter) return;
+    setCharacters((prev) =>
+      prev.map((c) => {
+        if (c.id !== activeCharacter.id) return c;
+        const exists = (c.chakraWeapons || []).some((w) => w.name === weapon.name);
+        if (exists) return c;
+        return { ...c, chakraWeapons: [...(c.chakraWeapons || []), weapon] };
+      })
+    );
+    setWeaponQuery('');
+    setWeaponResults([]);
+  };
+
+  const removeChakraWeapon = (id: string, name: string) => {
+    setCharacters((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? { ...c, chakraWeapons: (c.chakraWeapons || []).filter((w) => w.name !== name) }
+          : c
+      )
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
@@ -504,8 +564,6 @@ const NinjaGenerator: React.FC = () => {
               <Scroll className="w-8 h-8 text-orange-600" />
               <h1 className="text-3xl font-bold text-gray-800">Naruto NPC Generator</h1>
             </div>
-
-            {/* Import area toggle (top) */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowImportArea((s) => !s)}
@@ -728,7 +786,7 @@ const NinjaGenerator: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* HP Tracker with typed delta */}
+                    {/* HP Tracker */}
                     <div className="bg-red-50 p-4 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">HP</span>
@@ -780,7 +838,7 @@ const NinjaGenerator: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Chakra Tracker with typed delta */}
+                    {/* Chakra Tracker */}
                     <div className="bg-blue-50 p-4 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Chakra</span>
@@ -850,7 +908,7 @@ const NinjaGenerator: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Exported JSON area for this character */}
+                    {/* Exported JSON */}
                     <div className="bg-white p-3 rounded">
                       <h4 className="font-bold mb-2">Exported JSON</h4>
                       <textarea
@@ -862,14 +920,12 @@ const NinjaGenerator: React.FC = () => {
                           JSON.stringify(activeCharacter, null, 2)
                         }
                       />
-                      <div className="text-sm text-gray-500 mt-1">
-                        Click "Copy JSON" to copy to clipboard. You can also copy from this textarea.
-                      </div>
                     </div>
                   </div>
 
-                  {/* Right: jutsu, clan features, weapons */}
+                  {/* Right: jutsu, clan features, weapons, chakra weapons */}
                   <div className="space-y-4">
+                    {/* Jutsu */}
                     <div className="bg-purple-50 p-4 rounded-lg">
                       <h4 className="font-bold mb-2">Jutsu</h4>
                       <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -907,6 +963,7 @@ const NinjaGenerator: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Clan Features */}
                     {activeCharacter.clanFeatures.length > 0 && (
                       <div className="bg-indigo-50 p-4 rounded-lg">
                         <h4 className="font-bold mb-2">{activeCharacter.clan} Features</h4>
@@ -921,6 +978,7 @@ const NinjaGenerator: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Clan Jutsu */}
                     {activeCharacter.clanJutsu.length > 0 && (
                       <div className="bg-pink-50 p-4 rounded-lg">
                         <h4 className="font-bold mb-2">{activeCharacter.clan} Jutsu</h4>
@@ -952,6 +1010,7 @@ const NinjaGenerator: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Mundane Weapons */}
                     <div className="bg-green-50 p-4 rounded-lg">
                       <h4 className="font-bold mb-2">Weapons</h4>
                       <div className="space-y-2">
@@ -969,7 +1028,89 @@ const NinjaGenerator: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Optional: show clan abilities as strings for parity with original App */}
+                    {/* Chakra Weapons: Add + List */}
+                    <div className="bg-orange-100 p-4 rounded-lg">
+                      <h4 className="font-bold mb-2">Chakra Weapons</h4>
+
+                      {/* Add box */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="text"
+                          value={weaponQuery}
+                          onChange={(e) => onSearchWeapons(e.target.value)}
+                          className="flex-1 border rounded px-2 py-1"
+                          placeholder="Search chakra weapons..."
+                          list="chakra-weapon-names"
+                        />
+                        <datalist id="chakra-weapon-names">
+                          {CHAKRA_WEAPON_NAMES.map((n) => (
+                            <option key={n} value={n} />
+                          ))}
+                        </datalist>
+                        <button
+                          onClick={() => weaponQuery && addChakraWeaponToActive(weaponQuery)}
+                          className="px-3 py-1 bg-orange-600 text-white rounded disabled:opacity-50"
+                          disabled={!weaponQuery}
+                          title="Add weapon by exact name"
+                        >
+                          <Plus className="w-4 h-4 inline-block" /> Add
+                        </button>
+                      </div>
+
+                      {/* Live suggestions */}
+                      {weaponQuery && weaponResults.length > 0 && (
+                        <div className="border rounded p-2 bg-white max-h-40 overflow-y-auto mb-3">
+                          {weaponResults.map((w) => (
+                            <button
+                              key={w.name}
+                              onClick={() => addChakraWeaponToActive(w.name)}
+                              className="w-full text-left px-2 py-1 hover:bg-gray-100 rounded"
+                            >
+                              <span className="font-medium">{w.name}</span>
+                              <span className="text-xs text-gray-500">
+                                {w.type ? ` • ${w.type}` : ''} {w.rank ? ` • ${w.rank}` : ''}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* List on character */}
+                      {activeCharacter.chakraWeapons && activeCharacter.chakraWeapons.length > 0 ? (
+                        <div className="space-y-2 max-h-72 overflow-y-auto">
+                          {activeCharacter.chakraWeapons.map((cw) => (
+                            <details key={cw.name} className="bg-white p-3 rounded">
+                              <summary className="flex items-start justify-between cursor-pointer">
+                                <div>
+                                  <div className="font-semibold">{cw.name}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {cw.type ? `${cw.type}` : 'Weapon'}
+                                    {cw.rank ? ` • ${cw.rank}` : ''}
+                                    {cw.attunement ? ' • requires attunement' : ''}
+                                  </div>
+                                </div>
+                                <button
+                                  className="ml-2 text-xs text-red-600 hover:underline"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    removeChakraWeapon(activeCharacter.id, cw.name);
+                                  }}
+                                >
+                                  remove
+                                </button>
+                              </summary>
+                              <div className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">
+                                {cw.description || 'No description available.'}
+                              </div>
+                            </details>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-600">No chakra weapons added.</div>
+                      )}
+                    </div>
+
+                    {/* Clan Abilities (string list) */}
                     {activeCharacter.abilities?.length > 0 && (
                       <div className="bg-yellow-50 p-4 rounded-lg">
                         <h4 className="font-bold mb-2">Clan Abilities</h4>
