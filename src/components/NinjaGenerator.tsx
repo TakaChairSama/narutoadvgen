@@ -135,7 +135,7 @@ const NinjaGenerator: React.FC = () => {
     );
   };
 
-  // Generate character using repo libs for jutsu and clan data
+  // Generate character
   const handleGenerate = async () => {
     const crRanges: Record<NinjaRank, [number, number]> = {
       Genin: [1, 4],
@@ -355,136 +355,135 @@ const NinjaGenerator: React.FC = () => {
     }
   };
 
-  // Level up/down core
+  // Level up/down core — fixed to avoid async state updaters
   const applyCRChange = async (id: string, delta: 1 | -1) => {
-    setCharacters(async (prev) => {
-      const list = [...prev];
-      const idx = list.findIndex((c) => c.id === id);
-      if (idx === -1) return prev;
+    const current = characters.find((c) => c.id === id);
+    if (!current) return;
 
-      const ch = list[idx];
-      const newCR = Math.max(1, Math.min(20, ch.cr + delta));
-      if (newCR === ch.cr) return prev;
+    const newCR = Math.max(1, Math.min(20, current.cr + delta));
+    if (newCR === current.cr) return;
 
-      const newRank = rankFromCR(newCR);
-      const lvl = levelFromCR(newCR);
-      const prof = Math.floor((newCR - 1) / 4) + 2;
+    const newRank = rankFromCR(newCR);
+    const lvl = levelFromCR(newCR);
+    const prof = Math.floor((newCR - 1) / 4) + 2;
 
-      // Prepare base stats
-      const baseStats = ch.baseStats ?? { ...ch.stats };
-      const baseCR = typeof ch.baseCR === 'number' ? ch.baseCR : ch.cr;
+    // Prepare base stats
+    const baseStats = current.baseStats ?? { ...current.stats };
+    const baseCR = typeof current.baseCR === 'number' ? current.baseCR : current.cr;
 
-      // Compute new stats from base with delta per level
-      const specKey = specialtyStatKey(ch.specialty);
-      const levelDiff = newCR - baseCR;
-      const newStats: Record<string, number> = { ...baseStats };
-      // ensure keys exist
-      for (const key of ['str', 'dex', 'con', 'int', 'wis', 'cha']) {
-        if (typeof (newStats as any)[key] !== 'number') (newStats as any)[key] = 10;
+    // Compute new stats from base with delta per level
+    const specKey = specialtyStatKey(current.specialty);
+    const levelDiff = newCR - baseCR;
+    const newStats: Record<string, number> = { ...baseStats };
+    for (const key of ['str', 'dex', 'con', 'int', 'wis', 'cha']) {
+      if (typeof (newStats as any)[key] !== 'number') (newStats as any)[key] = 10;
+    }
+    newStats[specKey] = (newStats[specKey] ?? 10) + 0.5 * levelDiff;
+    newStats['con'] = (newStats['con'] ?? 10) + 0.5 * levelDiff;
+
+    const newModifiers = Object.fromEntries(
+      Object.entries(newStats).map(([k, v]) => [k, calculateModifier(Math.floor(v))])
+    ) as Record<string, number>;
+
+    // HP/Chakra change amount per level step (mirrors Level Up logic, reverses on down)
+    const hpStep = rollDice(12) + (newModifiers.con ?? 0);
+    const chakraStep = rollDice(12) + (newModifiers.con ?? 0);
+    const signedHp = delta === 1 ? hpStep : -hpStep;
+    const signedChakra = delta === 1 ? chakraStep : -chakraStep;
+
+    const newMaxHp = Math.max(1, current.maxHp + signedHp);
+    const newMaxChakra = Math.max(0, current.maxChakra + signedChakra);
+    const newHp = Math.max(0, current.hp + signedHp);
+    const newChakra = Math.max(0, current.chakra + signedChakra);
+
+    // XP
+    const newXP = XP_BY_CR[newCR] ?? 0;
+
+    // Jutsu updates:
+    const newClanJutsu =
+      current.clan && current.clan !== 'None'
+        ? getClanJutsu(current.clan as NinjaClan, newRank)
+        : ([] as JutsuType[]);
+
+    // Filter non-clan jutsu to allowed ranks for the new rank
+    const allowed = new Set(ALLOWED_RANKS[newRank]);
+    const clanNames = new Set(newClanJutsu.map((j) => j.name));
+    const filteredJutsu = current.jutsu.filter(
+      (j) => allowed.has(j.rank as any) || clanNames.has(j.name)
+    );
+
+    // On specific CRs when leveling up, add one specialty + one elemental jutsu if available
+    let finalJutsu = [...filteredJutsu];
+    if (delta === 1 && [5, 9, 13, 17].includes(newCR)) {
+      const pool = getJutsu(newRank, current.specialty, current.chakraNatures);
+      const existing = new Set(finalJutsu.map((j) => j.name));
+
+      // specialty candidates
+      let specialtyCandidates = pool.filter((j) => j.keywords?.includes(current.specialty));
+      if (current.specialty === 'Ninjutsu') {
+        specialtyCandidates = specialtyCandidates.filter(
+          (j) => !j.nature || current.chakraNatures.includes(j.nature)
+        );
       }
-      newStats[specKey] = (newStats[specKey] ?? 10) + 0.5 * levelDiff;
-      newStats['con'] = (newStats['con'] ?? 10) + 0.5 * levelDiff;
-
-      const newModifiers = Object.fromEntries(
-        Object.entries(newStats).map(([k, v]) => [k, calculateModifier(Math.floor(v))])
-      ) as Record<string, number>;
-
-      // HP/Chakra change amount per level step
-      const hpStep = rollDice(12) + (newModifiers.con ?? 0);
-      const chakraStep = rollDice(12) + (newModifiers.con ?? 0);
-      const signedHp = delta === 1 ? hpStep : -hpStep;
-      const signedChakra = delta === 1 ? chakraStep : -chakraStep;
-
-      const newMaxHp = Math.max(1, ch.maxHp + signedHp);
-      const newMaxChakra = Math.max(0, ch.maxChakra + signedChakra);
-      const newHp = Math.max(0, ch.hp + signedHp);
-      const newChakra = Math.max(0, ch.chakra + signedChakra);
-
-      // XP
-      const newXP = XP_BY_CR[newCR] ?? 0;
-
-      // Jutsu updates:
-      // 1) Always refresh clan jutsu to the current rank
-      const newClanJutsu =
-        ch.clan && ch.clan !== 'None' ? getClanJutsu(ch.clan as NinjaClan, newRank) : ([] as JutsuType[]);
-
-      // 2) Filter non-clan jutsu to allowed ranks for the new rank
-      const allowed = new Set(ALLOWED_RANKS[newRank]);
-      const isClanJutsuName = new Set(newClanJutsu.map((j) => j.name));
-      const filteredJutsu = ch.jutsu.filter(
-        (j) => allowed.has(j.rank as any) || isClanJutsuName.has(j.name)
-      );
-
-      // 3) On specific CRs when leveling up, add one specialty + one elemental jutsu if available
-      let finalJutsu = [...filteredJutsu];
-      if (delta === 1 && [5, 9, 13, 17].includes(newCR)) {
-        const pool = getJutsu(newRank, ch.specialty, ch.chakraNatures);
-        const existing = new Set(finalJutsu.map((j) => j.name));
-
-        // specialty jutsu preference
-        let specialtyCandidates = pool.filter((j) => j.keywords?.includes(ch.specialty));
-        if (ch.specialty === 'Ninjutsu') {
-          specialtyCandidates = specialtyCandidates.filter(
-            (j) => !j.nature || ch.chakraNatures.includes(j.nature)
-          );
+      const addRandom = (arr: JutsuType[]) => {
+        const options = arr.filter((j) => !existing.has(j.name));
+        if (options.length > 0) {
+          const pick = options[Math.floor(Math.random() * options.length)];
+          finalJutsu.push(pick);
+          existing.add(pick.name);
         }
-        const addRandom = (arr: JutsuType[]) => {
-          const options = arr.filter((j) => !existing.has(j.name));
-          if (options.length > 0) {
-            const pick = options[Math.floor(Math.random() * options.length)];
-            finalJutsu.push(pick);
-            existing.add(pick.name);
-          }
-        };
-
-        addRandom(specialtyCandidates);
-
-        // elemental jutsu
-        const elemental = pool.filter((j) => j.nature && ch.chakraNatures.includes(j.nature));
-        addRandom(elemental);
-      }
-
-      // Merge in clan jutsu (avoid duplicates)
-      const existingNames = new Set(finalJutsu.map((j) => j.name));
-      for (const cj of newClanJutsu) {
-        if (!existingNames.has(cj.name)) {
-          finalJutsu.push(cj);
-          existingNames.add(cj.name);
-        }
-      }
-
-      // Clan features as strings and structured features
-      const newAbilities =
-        ch.clan && ch.clan !== 'None' ? getClanFeatures(ch.clan as NinjaClan, lvl) : ([] as string[]);
-      const allFeatures = await loadClanFeatures(ch.clan);
-      const newStructuredFeatures = allFeatures.filter((f) => (f?.level ?? 0) <= lvl);
-
-      // AC and other derived
-      const newAC = 11 + (newModifiers.dex ?? 0) + newCR + 3;
-
-      list[idx] = {
-        ...ch,
-        cr: newCR,
-        rank: newRank,
-        xp: newXP,
-        stats: newStats,
-        modifiers: newModifiers,
-        maxHp: newMaxHp,
-        maxChakra: newMaxChakra,
-        hp: newHp,
-        chakra: newChakra,
-        jutsu: finalJutsu,
-        clanJutsu: newClanJutsu,
-        abilities: newAbilities,
-        clanFeatures: newStructuredFeatures,
-        proficiencyBonus: prof,
-        ac: newAC,
-        // ensure base references exist for future recalcs
-        baseStats: ch.baseStats ?? { ...ch.stats },
-        baseCR: typeof ch.baseCR === 'number' ? ch.baseCR : ch.cr,
       };
-      return list;
-    });
+
+      addRandom(specialtyCandidates);
+
+      // elemental jutsu
+      const elemental = pool.filter((j) => j.nature && current.chakraNatures.includes(j.nature));
+      addRandom(elemental);
+    }
+
+    // Merge in clan jutsu (avoid duplicates)
+    const afterNames = new Set(finalJutsu.map((j) => j.name));
+    for (const cj of newClanJutsu) {
+      if (!afterNames.has(cj.name)) {
+        finalJutsu.push(cj);
+        afterNames.add(cj.name);
+      }
+    }
+
+    // Clan features as strings and structured features
+    const newAbilities =
+      current.clan && current.clan !== 'None'
+        ? getClanFeatures(current.clan as NinjaClan, lvl)
+        : ([] as string[]);
+    const allFeatures = await loadClanFeatures(current.clan);
+    const newStructuredFeatures = allFeatures.filter((f) => (f?.level ?? 0) <= lvl);
+
+    // AC and other derived
+    const newAC = 11 + (newModifiers.dex ?? 0) + newCR + 3;
+
+    const updated: NinjaCharacter = {
+      ...current,
+      cr: newCR,
+      rank: newRank,
+      xp: newXP,
+      stats: newStats,
+      modifiers: newModifiers,
+      maxHp: newMaxHp,
+      maxChakra: newMaxChakra,
+      hp: newHp,
+      chakra: newChakra,
+      jutsu: finalJutsu,
+      clanJutsu: newClanJutsu,
+      abilities: newAbilities,
+      clanFeatures: newStructuredFeatures,
+      proficiencyBonus: prof,
+      ac: newAC,
+      // persist base references
+      baseStats: current.baseStats ?? { ...current.stats },
+      baseCR: typeof current.baseCR === 'number' ? current.baseCR : current.cr,
+    };
+
+    setCharacters((prev) => prev.map((c) => (c.id === id ? updated : c)));
   };
 
   const activeCharacter = characters.find((c) => c.id === activeTab);
@@ -702,7 +701,7 @@ const NinjaGenerator: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg-grid-cols-1 xl:grid-cols-2 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 lg:grid-cols-2 gap-6">
                   {/* Left: basic info, trackers, stats */}
                   <div className="space-y-4">
                     <div className="bg-orange-50 p-4 rounded-lg">
