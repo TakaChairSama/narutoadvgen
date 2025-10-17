@@ -81,7 +81,7 @@ interface NinjaCharacter {
   name: string;
   clan: NinjaClan | 'None';
   rank: NinjaRank;
-  cr: number;
+  cr: number; // stored as "Level" for UI
   xp: number;
   chakraNatures: ChakraNature[];
   specialty: NinjaSpecialty;
@@ -190,6 +190,9 @@ const NinjaGenerator: React.FC = () => {
       },
     ];
 
+    // AC progression: +0.5 per Level (floor)
+    const ac = 11 + (modifiers.dex ?? 0) + Math.floor(0.5 * cr) + 3;
+
     const newChar: NinjaCharacter = {
       id: `${Date.now()}-${Math.random()}`,
       name: customName || `${clan} ${rank}`,
@@ -205,7 +208,7 @@ const NinjaGenerator: React.FC = () => {
       maxHp: totalHP,
       chakra: totalChakra,
       maxChakra: totalChakra,
-      ac: 11 + (modifiers.dex ?? 0) + cr + 3,
+      ac,
       speed: 30,
       jutsu: combinedJutsu,
       clanFeatures: filteredFeatures,
@@ -301,6 +304,9 @@ const NinjaGenerator: React.FC = () => {
             Object.entries(stats).map(([k, v]) => [k, calculateModifier(Math.floor(Number(v) || 10))])
           );
 
+        // AC progression from imported Level
+        const ac = 11 + (modifiers.dex ?? 0) + Math.floor(0.5 * cr) + 3;
+
         const ch: NinjaCharacter = {
           id,
           name: String(raw.name || `${rawClan} ${rawRank}`),
@@ -317,7 +323,7 @@ const NinjaGenerator: React.FC = () => {
           maxHp: Number(raw.maxHp || raw.hp || 1),
           chakra: Number(raw.chakra || 0),
           maxChakra: Number(raw.maxChakra || raw.chakra || 0),
-          ac: Number(raw.ac || 10),
+          ac,
           speed: Number(raw.speed || 30),
           jutsu: mergedJutsu,
           clanFeatures: filteredFeatures,
@@ -355,7 +361,7 @@ const NinjaGenerator: React.FC = () => {
     }
   };
 
-  // Level up/down core — fixed to avoid async state updaters
+  // Level up/down core — recompute using new AC progression and Level language
   const applyCRChange = async (id: string, delta: 1 | -1) => {
     const current = characters.find((c) => c.id === id);
     if (!current) return;
@@ -458,8 +464,8 @@ const NinjaGenerator: React.FC = () => {
     const allFeatures = await loadClanFeatures(current.clan);
     const newStructuredFeatures = allFeatures.filter((f) => (f?.level ?? 0) <= lvl);
 
-    // AC and other derived
-    const newAC = 11 + (newModifiers.dex ?? 0) + newCR + 3;
+    // AC: +0.5 per Level (floor)
+    const newAC = 11 + (newModifiers.dex ?? 0) + Math.floor(0.5 * newCR) + 3;
 
     const updated: NinjaCharacter = {
       ...current,
@@ -668,19 +674,19 @@ const NinjaGenerator: React.FC = () => {
                     <button
                       onClick={() => applyCRChange(activeCharacter.id, -1)}
                       className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-                      title="Level Down (CR -1)"
+                      title="Level Down"
                     >
-                      CR -1
+                      Lvl -
                     </button>
                     <div className="px-3 py-1 rounded bg-gray-100">
-                      CR {activeCharacter.cr} • {activeCharacter.rank} • XP {activeCharacter.xp}
+                      Level {activeCharacter.cr} • {activeCharacter.rank} • XP {activeCharacter.xp}
                     </div>
                     <button
                       onClick={() => applyCRChange(activeCharacter.id, +1)}
                       className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-                      title="Level Up (CR +1)"
+                      title="Level Up"
                     >
-                      CR +1
+                      Lvl +
                     </button>
                   </div>
                   <div className="flex gap-2">
