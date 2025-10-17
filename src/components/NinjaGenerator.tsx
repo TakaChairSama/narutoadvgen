@@ -13,15 +13,41 @@ import {
   NINJA_CLANS,
   NINJA_RANKS,
   NINJA_SPECIALTIES,
+  XP_BY_CR,
 } from '../data/naruto';
 import { getJutsu as getJutsuFromLibrary } from '../data/jutsuLibrary';
-import { getClanFeatures, getClanJutsu } from '../utils/generator';
+import { getClanFeatures, getClanJutsu, getJutsu } from '../utils/generator';
 
 // helpers
 const rollDice = (sides: number) => Math.floor(Math.random() * sides) + 1;
 const calculateModifier = (score: number) => Math.floor((score - 10) / 2);
 const levelFromCR = (cr: number) => Math.floor((cr + 1) / 2);
 const resolveClanFile = (clan: string) => String(clan).toLowerCase().replace(/\s+/g, '');
+
+const rankFromCR = (cr: number): NinjaRank => {
+  if (cr <= 4) return 'Genin';
+  if (cr <= 8) return 'Chunin';
+  if (cr <= 12) return 'Jonin';
+  if (cr <= 16) return 'ANBU';
+  return 'Kage';
+};
+
+const specialtyStatKey = (spec: NinjaSpecialty): keyof Record<string, number> => {
+  if (spec === 'Ninjutsu') return 'int';
+  if (spec === 'Genjutsu') return 'wis';
+  if (spec === 'Taijutsu') return 'str';
+  if (spec === 'Bukijutsu') return 'dex';
+  if (spec === 'Fuinjutsu') return 'int';
+  return 'int';
+};
+
+const ALLOWED_RANKS: Record<NinjaRank, Array<'D' | 'C' | 'B' | 'A' | 'S'>> = {
+  Genin: ['D'],
+  Chunin: ['D', 'C'],
+  Jonin: ['D', 'C', 'B'],
+  ANBU: ['D', 'C', 'B', 'A'],
+  Kage: ['D', 'C', 'B', 'A', 'S'],
+};
 
 const generateStats = (cr: number) => {
   const stats: Record<string, number> = {};
@@ -37,31 +63,6 @@ const generateStats = (cr: number) => {
   return stats;
 };
 
-interface NinjaCharacter {
-  id: string;
-  name: string;
-  clan: NinjaClan | 'None';
-  rank: NinjaRank;
-  cr: number;
-  xp: number;
-  chakraNatures: ChakraNature[];
-  specialty: NinjaSpecialty;
-  stats: Record<string, number>;
-  modifiers: Record<string, number>;
-  hp: number;
-  maxHp: number;
-  chakra: number;
-  maxChakra: number;
-  ac: number;
-  speed: number;
-  jutsu: JutsuType[];
-  clanFeatures: ClanFeature[]; // structured features for display
-  clanJutsu: JutsuType[]; // jutsu derived from clan and rank
-  weapons: any[];
-  abilities: string[]; // clan features as strings (compatibility)
-  proficiencyBonus: number;
-}
-
 async function loadClanFeatures(clan: NinjaClan | 'None'): Promise<ClanFeature[]> {
   if (!clan || clan === 'None') return [];
   try {
@@ -73,6 +74,34 @@ async function loadClanFeatures(clan: NinjaClan | 'None'): Promise<ClanFeature[]
   } catch {
     return [];
   }
+}
+
+interface NinjaCharacter {
+  id: string;
+  name: string;
+  clan: NinjaClan | 'None';
+  rank: NinjaRank;
+  cr: number;
+  xp: number;
+  chakraNatures: ChakraNature[];
+  specialty: NinjaSpecialty;
+  stats: Record<string, number>; // may contain .5 increments
+  modifiers: Record<string, number>;
+  hp: number; // current (can exceed max; excess is temp)
+  maxHp: number;
+  chakra: number; // current (can exceed max; excess is temp)
+  maxChakra: number;
+  ac: number;
+  speed: number;
+  jutsu: JutsuType[];
+  clanFeatures: ClanFeature[]; // structured features for display
+  clanJutsu: JutsuType[]; // clan jutsu by rank
+  weapons: any[];
+  abilities: string[]; // clan features as strings (compat)
+  proficiencyBonus: number;
+  // For reversible stat scaling by CR
+  baseStats?: Record<string, number>;
+  baseCR?: number;
 }
 
 const NinjaGenerator: React.FC = () => {
@@ -93,8 +122,12 @@ const NinjaGenerator: React.FC = () => {
   const [importText, setImportText] = useState('');
   const [showImportArea, setShowImportArea] = useState(false);
 
-  // Per-character exported JSON preview (optional override; defaults to current JSON)
+  // Per-character exported JSON preview
   const [exportedJsonById, setExportedJsonById] = useState<Record<string, string>>({});
+
+  // HP/Chakra typed deltas
+  const [hpDelta, setHpDelta] = useState<string>(''); // applied to active character
+  const [chakraDelta, setChakraDelta] = useState<string>(''); // applied to active character
 
   const handleNatureToggle = (nature: ChakraNature) => {
     setSelectedNatures((prev) =>
@@ -102,7 +135,7 @@ const NinjaGenerator: React.FC = () => {
     );
   };
 
-  // Generate character using repo libraries for jutsu and clan data
+  // Generate character using repo libs for jutsu and clan data
   const handleGenerate = async () => {
     const crRanges: Record<NinjaRank, [number, number]> = {
       Genin: [1, 4],
@@ -139,11 +172,11 @@ const NinjaGenerator: React.FC = () => {
       combinedJutsu.push(j);
     }
 
-    // Abilities as strings via repo util (compatibility with original UI expectations)
+    // Abilities as strings via repo util
     const abilityStrings =
       clan && clan !== 'None' ? getClanFeatures(clan as NinjaClan, lvl) : ([] as string[]);
 
-    // Structured clan features loaded from the clan module and filtered by level
+    // Structured clan features loaded from clan module and filtered by level
     const allFeatures = await loadClanFeatures(clan);
     const filteredFeatures = allFeatures.filter((f) => (f?.level ?? 0) <= lvl);
 
@@ -163,7 +196,7 @@ const NinjaGenerator: React.FC = () => {
       clan,
       rank,
       cr,
-      xp: 0,
+      xp: XP_BY_CR[cr] ?? 0,
       chakraNatures: selectedNatures,
       specialty,
       stats,
@@ -180,6 +213,8 @@ const NinjaGenerator: React.FC = () => {
       weapons,
       abilities: abilityStrings,
       proficiencyBonus,
+      baseStats: { ...stats },
+      baseCR: cr,
     };
 
     setCharacters((prev) => [...prev, newChar]);
@@ -192,19 +227,39 @@ const NinjaGenerator: React.FC = () => {
     if (activeTab === id) setActiveTab(characters[0]?.id || null);
   };
 
+  // Apply typed delta to HP (can exceed max and will be displayed as temp)
+  const applyHpDelta = (id: string) => {
+    const delta = Number(hpDelta || 0);
+    if (!Number.isFinite(delta)) return;
+    setCharacters((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, hp: Math.max(0, c.hp + delta) } : c))
+    );
+    setHpDelta('');
+  };
+
+  // Apply typed delta to Chakra (can exceed max and will be displayed as temp)
+  const applyChakraDelta = (id: string) => {
+    const delta = Number(chakraDelta || 0);
+    if (!Number.isFinite(delta)) return;
+    setCharacters((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, chakra: Math.max(0, c.chakra + delta) } : c))
+    );
+    setChakraDelta('');
+  };
+
   const handleHPChange = (id: string, newHP: number) => {
     setCharacters((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, hp: Math.max(0, Math.min(newHP, c.maxHp)) } : c))
+      prev.map((c) => (c.id === id ? { ...c, hp: Math.max(0, newHP) } : c))
     );
   };
 
   const handleChakraChange = (id: string, newChakra: number) => {
     setCharacters((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, chakra: Math.max(0, Math.min(newChakra, c.maxChakra)) } : c))
+      prev.map((c) => (c.id === id ? { ...c, chakra: Math.max(0, newChakra) } : c))
     );
   };
 
-  // Import pasted JSON (top)
+  // Import pasted JSON (top) and enrich
   const importFromText = async () => {
     if (!importText) return;
     try {
@@ -217,7 +272,7 @@ const NinjaGenerator: React.FC = () => {
         const cr = Number(raw.cr ?? 1);
         const lvl = levelFromCR(cr);
         const rawClan: NinjaClan | 'None' = raw.clan && NINJA_CLANS.includes(raw.clan) ? raw.clan : 'None';
-        const rawRank: NinjaRank = raw.rank && NINJA_RANKS.includes(raw.rank) ? raw.rank : 'Genin';
+        const rawRank: NinjaRank = raw.rank && NINJA_RANKS.includes(raw.rank) ? raw.rank : rankFromCR(cr);
 
         const abilityStrings =
           rawClan && rawClan !== 'None' ? getClanFeatures(rawClan as NinjaClan, lvl) : ([] as string[]);
@@ -238,17 +293,26 @@ const NinjaGenerator: React.FC = () => {
         const allFeatures = await loadClanFeatures(rawClan);
         const filteredFeatures = allFeatures.filter((f) => (f?.level ?? 0) <= lvl);
 
+        // Ensure stats/proficiency
+        const stats = raw.stats || { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+        const modifiers =
+          raw.modifiers ||
+          Object.fromEntries(
+            Object.entries(stats).map(([k, v]) => [k, calculateModifier(Math.floor(Number(v) || 10))])
+          );
+
         const ch: NinjaCharacter = {
           id,
           name: String(raw.name || `${rawClan} ${rawRank}`),
           clan: rawClan,
           rank: rawRank,
           cr,
-          xp: Number(raw.xp || 0),
+          xp: Number(raw.xp ?? XP_BY_CR[cr] ?? 0),
           chakraNatures: Array.isArray(raw.chakraNatures) ? raw.chakraNatures : [],
-          specialty: raw.specialty && NINJA_SPECIALTIES.includes(raw.specialty) ? raw.specialty : 'Ninjutsu',
-          stats: raw.stats || { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-          modifiers: raw.modifiers || { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+          specialty:
+            raw.specialty && NINJA_SPECIALTIES.includes(raw.specialty) ? raw.specialty : 'Ninjutsu',
+          stats,
+          modifiers,
           hp: Number(raw.hp || 1),
           maxHp: Number(raw.maxHp || raw.hp || 1),
           chakra: Number(raw.chakra || 0),
@@ -261,6 +325,8 @@ const NinjaGenerator: React.FC = () => {
           weapons: Array.isArray(raw.weapons) ? raw.weapons : [],
           abilities: Array.isArray(raw.abilities) ? raw.abilities : abilityStrings,
           proficiencyBonus: Number(raw.proficiencyBonus || Math.floor((cr - 1) / 4) + 2),
+          baseStats: raw.baseStats || { ...stats },
+          baseCR: Number(raw.baseCR ?? cr),
         };
 
         enriched.push(ch);
@@ -275,6 +341,7 @@ const NinjaGenerator: React.FC = () => {
     }
   };
 
+  // Export single character JSON (per-character)
   const handleExportForChar = async (id: string) => {
     const ch = characters.find((c) => c.id === id);
     if (!ch) return;
@@ -286,6 +353,138 @@ const NinjaGenerator: React.FC = () => {
     } catch {
       // If clipboard fails, user can copy from textarea
     }
+  };
+
+  // Level up/down core
+  const applyCRChange = async (id: string, delta: 1 | -1) => {
+    setCharacters(async (prev) => {
+      const list = [...prev];
+      const idx = list.findIndex((c) => c.id === id);
+      if (idx === -1) return prev;
+
+      const ch = list[idx];
+      const newCR = Math.max(1, Math.min(20, ch.cr + delta));
+      if (newCR === ch.cr) return prev;
+
+      const newRank = rankFromCR(newCR);
+      const lvl = levelFromCR(newCR);
+      const prof = Math.floor((newCR - 1) / 4) + 2;
+
+      // Prepare base stats
+      const baseStats = ch.baseStats ?? { ...ch.stats };
+      const baseCR = typeof ch.baseCR === 'number' ? ch.baseCR : ch.cr;
+
+      // Compute new stats from base with delta per level
+      const specKey = specialtyStatKey(ch.specialty);
+      const levelDiff = newCR - baseCR;
+      const newStats: Record<string, number> = { ...baseStats };
+      // ensure keys exist
+      for (const key of ['str', 'dex', 'con', 'int', 'wis', 'cha']) {
+        if (typeof (newStats as any)[key] !== 'number') (newStats as any)[key] = 10;
+      }
+      newStats[specKey] = (newStats[specKey] ?? 10) + 0.5 * levelDiff;
+      newStats['con'] = (newStats['con'] ?? 10) + 0.5 * levelDiff;
+
+      const newModifiers = Object.fromEntries(
+        Object.entries(newStats).map(([k, v]) => [k, calculateModifier(Math.floor(v))])
+      ) as Record<string, number>;
+
+      // HP/Chakra change amount per level step
+      const hpStep = rollDice(12) + (newModifiers.con ?? 0);
+      const chakraStep = rollDice(12) + (newModifiers.con ?? 0);
+      const signedHp = delta === 1 ? hpStep : -hpStep;
+      const signedChakra = delta === 1 ? chakraStep : -chakraStep;
+
+      const newMaxHp = Math.max(1, ch.maxHp + signedHp);
+      const newMaxChakra = Math.max(0, ch.maxChakra + signedChakra);
+      const newHp = Math.max(0, ch.hp + signedHp);
+      const newChakra = Math.max(0, ch.chakra + signedChakra);
+
+      // XP
+      const newXP = XP_BY_CR[newCR] ?? 0;
+
+      // Jutsu updates:
+      // 1) Always refresh clan jutsu to the current rank
+      const newClanJutsu =
+        ch.clan && ch.clan !== 'None' ? getClanJutsu(ch.clan as NinjaClan, newRank) : ([] as JutsuType[]);
+
+      // 2) Filter non-clan jutsu to allowed ranks for the new rank
+      const allowed = new Set(ALLOWED_RANKS[newRank]);
+      const isClanJutsuName = new Set(newClanJutsu.map((j) => j.name));
+      const filteredJutsu = ch.jutsu.filter(
+        (j) => allowed.has(j.rank as any) || isClanJutsuName.has(j.name)
+      );
+
+      // 3) On specific CRs when leveling up, add one specialty + one elemental jutsu if available
+      let finalJutsu = [...filteredJutsu];
+      if (delta === 1 && [5, 9, 13, 17].includes(newCR)) {
+        const pool = getJutsu(newRank, ch.specialty, ch.chakraNatures);
+        const existing = new Set(finalJutsu.map((j) => j.name));
+
+        // specialty jutsu preference
+        let specialtyCandidates = pool.filter((j) => j.keywords?.includes(ch.specialty));
+        if (ch.specialty === 'Ninjutsu') {
+          specialtyCandidates = specialtyCandidates.filter(
+            (j) => !j.nature || ch.chakraNatures.includes(j.nature)
+          );
+        }
+        const addRandom = (arr: JutsuType[]) => {
+          const options = arr.filter((j) => !existing.has(j.name));
+          if (options.length > 0) {
+            const pick = options[Math.floor(Math.random() * options.length)];
+            finalJutsu.push(pick);
+            existing.add(pick.name);
+          }
+        };
+
+        addRandom(specialtyCandidates);
+
+        // elemental jutsu
+        const elemental = pool.filter((j) => j.nature && ch.chakraNatures.includes(j.nature));
+        addRandom(elemental);
+      }
+
+      // Merge in clan jutsu (avoid duplicates)
+      const existingNames = new Set(finalJutsu.map((j) => j.name));
+      for (const cj of newClanJutsu) {
+        if (!existingNames.has(cj.name)) {
+          finalJutsu.push(cj);
+          existingNames.add(cj.name);
+        }
+      }
+
+      // Clan features as strings and structured features
+      const newAbilities =
+        ch.clan && ch.clan !== 'None' ? getClanFeatures(ch.clan as NinjaClan, lvl) : ([] as string[]);
+      const allFeatures = await loadClanFeatures(ch.clan);
+      const newStructuredFeatures = allFeatures.filter((f) => (f?.level ?? 0) <= lvl);
+
+      // AC and other derived
+      const newAC = 11 + (newModifiers.dex ?? 0) + newCR + 3;
+
+      list[idx] = {
+        ...ch,
+        cr: newCR,
+        rank: newRank,
+        xp: newXP,
+        stats: newStats,
+        modifiers: newModifiers,
+        maxHp: newMaxHp,
+        maxChakra: newMaxChakra,
+        hp: newHp,
+        chakra: newChakra,
+        jutsu: finalJutsu,
+        clanJutsu: newClanJutsu,
+        abilities: newAbilities,
+        clanFeatures: newStructuredFeatures,
+        proficiencyBonus: prof,
+        ac: newAC,
+        // ensure base references exist for future recalcs
+        baseStats: ch.baseStats ?? { ...ch.stats },
+        baseCR: typeof ch.baseCR === 'number' ? ch.baseCR : ch.cr,
+      };
+      return list;
+    });
   };
 
   const activeCharacter = characters.find((c) => c.id === activeTab);
@@ -464,8 +663,27 @@ const NinjaGenerator: React.FC = () => {
             {/* Character Display */}
             {activeCharacter && (
               <div className="p-6">
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
                   <div className="text-lg font-bold">{activeCharacter.name}</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => applyCRChange(activeCharacter.id, -1)}
+                      className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                      title="Level Down (CR -1)"
+                    >
+                      CR -1
+                    </button>
+                    <div className="px-3 py-1 rounded bg-gray-100">
+                      CR {activeCharacter.cr} • {activeCharacter.rank} • XP {activeCharacter.xp}
+                    </div>
+                    <button
+                      onClick={() => applyCRChange(activeCharacter.id, +1)}
+                      className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                      title="Level Up (CR +1)"
+                    >
+                      CR +1
+                    </button>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleExportForChar(activeCharacter.id)}
@@ -484,7 +702,7 @@ const NinjaGenerator: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg-grid-cols-1 xl:grid-cols-2 lg:grid-cols-2 gap-6">
                   {/* Left: basic info, trackers, stats */}
                   <div className="space-y-4">
                     <div className="bg-orange-50 p-4 rounded-lg">
@@ -497,12 +715,6 @@ const NinjaGenerator: React.FC = () => {
                           <span className="font-semibold">Rank:</span> {activeCharacter.rank}
                         </div>
                         <div>
-                          <span className="font-semibold">CR:</span> {activeCharacter.cr}
-                        </div>
-                        <div>
-                          <span className="font-semibold">XP:</span> {activeCharacter.xp}
-                        </div>
-                        <div>
                           <span className="font-semibold">AC:</span> {activeCharacter.ac}
                         </div>
                         <div>
@@ -511,65 +723,107 @@ const NinjaGenerator: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* HP and Chakra Trackers */}
+                    {/* HP Tracker with typed delta */}
                     <div className="bg-red-50 p-4 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">HP</span>
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleHPChange(activeCharacter.id, activeCharacter.hp - 1)}
-                            className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                          >
-                            -
-                          </button>
-                          <span>
-                            {activeCharacter.hp} / {activeCharacter.maxHp}
+                          <input
+                            type="number"
+                            value={activeCharacter.hp}
+                            onChange={(e) =>
+                              handleHPChange(activeCharacter.id, Number(e.target.value) || 0)
+                            }
+                            className="w-24 text-center border rounded"
+                          />
+                          <span className="text-sm text-gray-600">
+                            / {activeCharacter.maxHp}
+                            {activeCharacter.hp > activeCharacter.maxHp && (
+                              <span className="text-xs text-red-600">
+                                {' '}
+                                (+{activeCharacter.hp - activeCharacter.maxHp} temp)
+                              </span>
+                            )}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleHPChange(activeCharacter.id, activeCharacter.hp + 1)}
-                            className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                          >
-                            +
-                          </button>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="number"
+                          placeholder="+/- amount"
+                          value={hpDelta}
+                          onChange={(e) => setHpDelta(e.target.value)}
+                          className="w-28 border rounded px-2 py-1"
+                        />
+                        <button
+                          onClick={() => applyHpDelta(activeCharacter.id)}
+                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                        >
+                          Apply
+                        </button>
                       </div>
                       <div className="w-full bg-gray-300 rounded-full h-4">
                         <div
                           className="bg-red-500 h-4 rounded-full transition-all"
-                          style={{ width: `${(activeCharacter.hp / activeCharacter.maxHp) * 100}%` }}
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              (activeCharacter.hp / Math.max(1, activeCharacter.maxHp)) * 100
+                            )}%`,
+                          }}
                         />
                       </div>
                     </div>
 
+                    {/* Chakra Tracker with typed delta */}
                     <div className="bg-blue-50 p-4 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Chakra</span>
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleChakraChange(activeCharacter.id, activeCharacter.chakra - 1)}
-                            className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                          >
-                            -
-                          </button>
-                          <span>
-                            {activeCharacter.chakra} / {activeCharacter.maxChakra}
+                          <input
+                            type="number"
+                            value={activeCharacter.chakra}
+                            onChange={(e) =>
+                              handleChakraChange(activeCharacter.id, Number(e.target.value) || 0)
+                            }
+                            className="w-24 text-center border rounded"
+                          />
+                          <span className="text-sm text-gray-600">
+                            / {activeCharacter.maxChakra}
+                            {activeCharacter.chakra > activeCharacter.maxChakra && (
+                              <span className="text-xs text-blue-600">
+                                {' '}
+                                (+{activeCharacter.chakra - activeCharacter.maxChakra} temp)
+                              </span>
+                            )}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleChakraChange(activeCharacter.id, activeCharacter.chakra + 1)}
-                            className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                          >
-                            +
-                          </button>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="number"
+                          placeholder="+/- amount"
+                          value={chakraDelta}
+                          onChange={(e) => setChakraDelta(e.target.value)}
+                          className="w-28 border rounded px-2 py-1"
+                        />
+                        <button
+                          onClick={() => applyChakraDelta(activeCharacter.id)}
+                          className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          Apply
+                        </button>
                       </div>
                       <div className="w-full bg-gray-300 rounded-full h-4">
                         <div
                           className="bg-blue-500 h-4 rounded-full transition-all"
-                          style={{ width: `${(activeCharacter.chakra / activeCharacter.maxChakra) * 100}%` }}
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              (activeCharacter.chakra / Math.max(1, activeCharacter.maxChakra)) *
+                                100
+                            )}%`,
+                          }}
                         />
                       </div>
                     </div>
@@ -581,7 +835,7 @@ const NinjaGenerator: React.FC = () => {
                         {Object.entries(activeCharacter.stats).map(([key, value]) => (
                           <div key={key} className="text-center bg-white p-2 rounded">
                             <div className="text-xs text-gray-600 uppercase">{key}</div>
-                            <div className="text-lg font-bold">{value}</div>
+                            <div className="text-lg font-bold">{Math.floor(value)}</div>
                             <div className="text-sm text-gray-600">
                               ({activeCharacter.modifiers[key] >= 0 ? '+' : ''}
                               {activeCharacter.modifiers[key]})
