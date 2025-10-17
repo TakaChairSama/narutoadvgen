@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Scroll, Users, Plus, Download, Upload, X } from 'lucide-react';
+import { Scroll, Users, Plus, Upload, X } from 'lucide-react';
 import type {
   ChakraNature,
   NinjaRank,
@@ -73,6 +73,13 @@ const NinjaGenerator: React.FC = () => {
 
   const [clanFeatures, setClanFeatures] = useState<{ name: string; description: string }[]>([]);
   const [clanJutsu, setClanJutsu] = useState<JutsuType[]>([]);
+
+  // Import textarea state (top)
+  const [importText, setImportText] = useState('');
+  const [showImportArea, setShowImportArea] = useState(false);
+
+  // per-character exported JSON cache
+  const [exportedJsonById, setExportedJsonById] = useState<Record<string, string>>({});
 
   // dynamically import clan module (reads existing clan data files — no changes to them)
   useEffect(() => {
@@ -190,30 +197,41 @@ const NinjaGenerator: React.FC = () => {
     );
   };
 
-  const exportCharacters = () => {
-    const data = JSON.stringify(characters, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'ninja-characters.json';
-    a.click();
+  // Import pasted JSON (at top)
+  const importFromText = () => {
+    if (!importText) return;
+    try {
+      const parsed = JSON.parse(importText);
+      const toAdd: any[] = Array.isArray(parsed) ? parsed : [parsed];
+      const normalized = toAdd.map((item) => {
+        // ensure id exists
+        const id = item.id || `${Date.now()}-${Math.random()}`;
+        // Map clan data through repo if desired: if item.clan is set, dynamically pre-load clan jutsu/features for it
+        return { ...item, id };
+      });
+      setCharacters((prev) => [...prev, ...normalized]);
+      setActiveTab(normalized[normalized.length - 1].id);
+      setImportText('');
+      setShowImportArea(false);
+    } catch (err) {
+      alert('Failed to parse JSON. Ensure it is valid character JSON.');
+    }
   };
 
-  const importCharacters = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const imported = JSON.parse(String(event.target?.result));
-        if (Array.isArray(imported)) setCharacters((prev) => [...prev, ...imported]);
-        else alert('Imported file does not contain an array of characters');
-      } catch {
-        alert('Failed to import characters');
-      }
-    };
-    reader.readAsText(file);
+  // Export single character JSON (per-character)
+  const handleExportForChar = async (id: string) => {
+    const ch = characters.find((c) => c.id === id);
+    if (!ch) return;
+    const json = JSON.stringify(ch, null, 2);
+    setExportedJsonById((prev) => ({ ...prev, [id]: json }));
+    try {
+      await navigator.clipboard.writeText(json);
+      // small feedback
+      // eslint-disable-next-line no-alert
+      alert('Character JSON copied to clipboard');
+    } catch {
+      // ignore clipboard failures — textarea is available for manual copy
+    }
   };
 
   const activeCharacter = characters.find((c) => c.id === activeTab);
@@ -228,32 +246,34 @@ const NinjaGenerator: React.FC = () => {
               <Scroll className="w-8 h-8 text-orange-600" />
               <h1 className="text-3xl font-bold text-gray-800">Naruto NPC Generator</h1>
             </div>
-            <div className="flex gap-2">
+
+            {/* Import area toggle (top) */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowGenerator(!showGenerator)}
-                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition flex items-center gap-2"
+                onClick={() => setShowImportArea((s) => !s)}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
               >
-                <Plus className="w-5 h-5" />
-                {showGenerator ? 'Hide' : 'Show'} Generator
+                <Upload className="w-5 h-5 inline-block mr-2" />
+                Paste Import JSON
               </button>
-              {characters.length > 0 && (
-                <>
-                  <button
-                    onClick={exportCharacters}
-                    className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition flex items-center gap-2"
-                  >
-                    <Download className="w-5 h-5" />
-                    Export
-                  </button>
-                  <label className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition flex items-center gap-2 cursor-pointer">
-                    <Upload className="w-5 h-5" />
-                    Import
-                    <input type="file" accept=".json" onChange={importCharacters} className="hidden" />
-                  </label>
-                </>
-              )}
             </div>
           </div>
+
+          {showImportArea && (
+            <div className="mt-4">
+              <textarea
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                rows={6}
+                className="w-full border rounded p-2"
+                placeholder="Paste character JSON here (single object or array)"
+              />
+              <div className="flex gap-2 mt-2">
+                <button onClick={importFromText} className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Import JSON</button>
+                <button onClick={() => { setImportText(''); setShowImportArea(false); }} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Generator Form */}
@@ -360,32 +380,29 @@ const NinjaGenerator: React.FC = () => {
               ))}
             </div>
 
+            {/* Character Display */}
             {activeCharacter && (
               <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="text-lg font-bold">{activeCharacter.name}</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleExportForChar(activeCharacter.id)} className="px-3 py-1 bg-blue-500 text-white rounded">Copy JSON</button>
+                    <button onClick={() => setCharacters((prev) => prev.filter((c) => c.id !== activeCharacter.id))} className="px-3 py-1 bg-red-500 text-white rounded">Delete</button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Basic Info */}
+                  {/* Left: basic info, trackers, stats */}
                   <div className="space-y-4">
                     <div className="bg-orange-50 p-4 rounded-lg">
                       <h3 className="text-xl font-bold mb-2">{activeCharacter.name}</h3>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="font-semibold">Clan:</span> {activeCharacter.clan}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Rank:</span> {activeCharacter.rank}
-                        </div>
-                        <div>
-                          <span className="font-semibold">CR:</span> {activeCharacter.cr}
-                        </div>
-                        <div>
-                          <span className="font-semibold">XP:</span> {activeCharacter.xp}
-                        </div>
-                        <div>
-                          <span className="font-semibold">AC:</span> {activeCharacter.ac}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Speed:</span> {activeCharacter.speed}ft
-                        </div>
+                        <div><span className="font-semibold">Clan:</span> {activeCharacter.clan}</div>
+                        <div><span className="font-semibold">Rank:</span> {activeCharacter.rank}</div>
+                        <div><span className="font-semibold">CR:</span> {activeCharacter.cr}</div>
+                        <div><span className="font-semibold">XP:</span> {activeCharacter.xp}</div>
+                        <div><span className="font-semibold">AC:</span> {activeCharacter.ac}</div>
+                        <div><span className="font-semibold">Speed:</span> {activeCharacter.speed}ft</div>
                       </div>
                     </div>
 
@@ -394,30 +411,13 @@ const NinjaGenerator: React.FC = () => {
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">HP</span>
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleHPChange(activeCharacter.id, activeCharacter.hp - 1)}
-                            className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                          >
-                            -
-                          </button>
-                          <span>
-                            {activeCharacter.hp} / {activeCharacter.maxHp}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleHPChange(activeCharacter.id, activeCharacter.hp + 1)}
-                            className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                          >
-                            +
-                          </button>
+                          <button type="button" onClick={() => handleHPChange(activeCharacter.id, activeCharacter.hp - 1)} className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600">-</button>
+                          <span>{activeCharacter.hp} / {activeCharacter.maxHp}</span>
+                          <button type="button" onClick={() => handleHPChange(activeCharacter.id, activeCharacter.hp + 1)} className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600">+</button>
                         </div>
                       </div>
                       <div className="w-full bg-gray-300 rounded-full h-4">
-                        <div
-                          className="bg-red-500 h-4 rounded-full transition-all"
-                          style={{ width: `${(activeCharacter.hp / activeCharacter.maxHp) * 100}%` }}
-                        />
+                        <div className="bg-red-500 h-4 rounded-full transition-all" style={{ width: `${(activeCharacter.hp / activeCharacter.maxHp) * 100}%` }} />
                       </div>
                     </div>
 
@@ -425,30 +425,13 @@ const NinjaGenerator: React.FC = () => {
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Chakra</span>
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleChakraChange(activeCharacter.id, activeCharacter.chakra - 1)}
-                            className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                          >
-                            -
-                          </button>
-                          <span>
-                            {activeCharacter.chakra} / {activeCharacter.maxChakra}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleChakraChange(activeCharacter.id, activeCharacter.chakra + 1)}
-                            className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                          >
-                            +
-                          </button>
+                          <button type="button" onClick={() => handleChakraChange(activeCharacter.id, activeCharacter.chakra - 1)} className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">-</button>
+                          <span>{activeCharacter.chakra} / {activeCharacter.maxChakra}</span>
+                          <button type="button" onClick={() => handleChakraChange(activeCharacter.id, activeCharacter.chakra + 1)} className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600">+</button>
                         </div>
                       </div>
                       <div className="w-full bg-gray-300 rounded-full h-4">
-                        <div
-                          className="bg-blue-500 h-4 rounded-full transition-all"
-                          style={{ width: `${(activeCharacter.chakra / activeCharacter.maxChakra) * 100}%` }}
-                        />
+                        <div className="bg-blue-500 h-4 rounded-full transition-all" style={{ width: `${(activeCharacter.chakra / activeCharacter.maxChakra) * 100}%` }} />
                       </div>
                     </div>
 
@@ -460,17 +443,21 @@ const NinjaGenerator: React.FC = () => {
                           <div key={key} className="text-center bg-white p-2 rounded">
                             <div className="text-xs text-gray-600 uppercase">{key}</div>
                             <div className="text-lg font-bold">{value}</div>
-                            <div className="text-sm text-gray-600">
-                              ({activeCharacter.modifiers[key] >= 0 ? '+' : ''}
-                              {activeCharacter.modifiers[key]})
-                            </div>
+                            <div className="text-sm text-gray-600">({activeCharacter.modifiers[key] >= 0 ? '+' : ''}{activeCharacter.modifiers[key]})</div>
                           </div>
                         ))}
                       </div>
                     </div>
+
+                    {/* Exported JSON area for this character */}
+                    <div className="bg-white p-3 rounded">
+                      <h4 className="font-bold mb-2">Exported JSON</h4>
+                      <textarea readOnly rows={8} className="w-full border p-2 rounded" value={exportedJsonById[activeCharacter.id] || JSON.stringify(activeCharacter, null, 2)} />
+                      <div className="text-sm text-gray-500 mt-1">Click "Copy JSON" to copy to clipboard. You can also copy from this textarea.</div>
+                    </div>
                   </div>
 
-                  {/* Jutsu, Weapons, Abilities */}
+                  {/* Right: jutsu, clan features, weapons */}
                   <div className="space-y-4">
                     <div className="bg-purple-50 p-4 rounded-lg">
                       <h4 className="font-bold mb-2">Jutsu</h4>
@@ -480,25 +467,14 @@ const NinjaGenerator: React.FC = () => {
                             <summary className="flex justify-between items-start mb-1 cursor-pointer">
                               <div>
                                 <span className="font-semibold">{jutsu.name}</span>
-                                <div className="text-xs text-gray-500">
-                                  Rank {jutsu.rank}
-                                  {jutsu.keywords ? ` • ${jutsu.keywords.join(', ')}` : ''}
-                                </div>
+                                <div className="text-xs text-gray-500">Rank {jutsu.rank}{jutsu.keywords ? ` • ${jutsu.keywords.join(', ')}` : ''}</div>
                               </div>
                               <div className="text-xs bg-purple-200 px-2 py-1 rounded">Chakra: {jutsu.chakraCost}</div>
                             </summary>
                             <div className="text-sm text-gray-600 mt-2">
                               <p>{jutsu.description}</p>
-                              {jutsu.effects && (
-                                <ul className="list-disc pl-5 mt-2 text-xs text-gray-700">
-                                  {jutsu.effects.map((eff, i) => (
-                                    <li key={i}>{eff}</li>
-                                  ))}
-                                </ul>
-                              )}
-                              <div className="mt-2 text-xs text-gray-500">
-                                <strong>Casting Time:</strong> {jutsu.castingTime ?? '—'} • <strong>Range:</strong> {jutsu.range ?? '—'} • <strong>Duration:</strong> {jutsu.duration ?? '—'}
-                              </div>
+                              {jutsu.effects && <ul className="list-disc pl-5 mt-2 text-xs text-gray-700">{jutsu.effects.map((eff, i) => <li key={i}>{eff}</li>)}</ul>}
+                              <div className="mt-2 text-xs text-gray-500"><strong>Casting Time:</strong> {jutsu.castingTime ?? '—'} • <strong>Range:</strong> {jutsu.range ?? '—'} • <strong>Duration:</strong> {jutsu.duration ?? '—'}</div>
                             </div>
                           </details>
                         ))}
@@ -534,13 +510,7 @@ const NinjaGenerator: React.FC = () => {
                               </summary>
                               <div className="text-sm text-gray-600 mt-2">
                                 <p>{cj.description}</p>
-                                {cj.effects && (
-                                  <ul className="list-disc pl-5 mt-2 text-xs text-gray-700">
-                                    {cj.effects.map((eff, i) => (
-                                      <li key={i}>{eff}</li>
-                                    ))}
-                                  </ul>
-                                )}
+                                {cj.effects && <ul className="list-disc pl-5 mt-2 text-xs text-gray-700">{cj.effects.map((eff, i) => <li key={i}>{eff}</li>)}</ul>}
                               </div>
                             </details>
                           ))}
@@ -573,6 +543,13 @@ const NinjaGenerator: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {characters.length === 0 && !showGenerator && (
+          <div className="bg-white rounded-lg shadow-lg p-12 text-center">
+            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-xl text-gray-600">No characters yet. Generate your first ninja!</p>
           </div>
         )}
       </div>
