@@ -1,4 +1,7 @@
 import {
+  AbilityStat,
+  ClanFeature,
+  CharacterSkill,
   NinjaCharacter,
   NinjaClan,
   NinjaRank,
@@ -7,15 +10,14 @@ import {
   Weapon,
   Jutsu,
   ClanJutsu,
+  TechniqueScaling,
 } from '../types/naruto';
 import {
   CR_RANGES,
   XP_BY_CR,
   CLAN_ABILITIES,
-  BASE_JUTSU,
   WEAPON_TYPES,
   WEAPON_TRAITS,
-  WEAPON_PROPERTIES,
 } from '../data/naruto';
 import { getJutsu as getJutsuFromLibrary } from '../data/jutsuLibrary';
 
@@ -61,7 +63,7 @@ import {
 const CLAN_DATA = new Map<
   NinjaClan,
   {
-    features: any[];
+    features: ClanFeature[];
     jutsu: ClanJutsu[];
   }
 >();
@@ -226,6 +228,45 @@ export function rollDice(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
 }
 
+const SKILL_DEFINITIONS: Array<{ name: string; stat: AbilityStat }> = [
+  { name: 'Acrobatics', stat: 'dex' },
+  { name: 'Animal Handling', stat: 'wis' },
+  { name: 'Athletics', stat: 'str' },
+  { name: 'Chakra Control', stat: 'con' },
+  { name: 'Crafting', stat: 'int' },
+  { name: 'Deception', stat: 'cha' },
+  { name: 'Illusions', stat: 'wis' },
+  { name: 'Insight', stat: 'wis' },
+  { name: 'History', stat: 'int' },
+  { name: 'Intimidation', stat: 'cha' },
+  { name: 'Investigation', stat: 'int' },
+  { name: 'Medicine', stat: 'wis' },
+  { name: 'Nature', stat: 'int' },
+  { name: 'Ninshou', stat: 'int' },
+  { name: 'Perception', stat: 'wis' },
+  { name: 'Performance', stat: 'cha' },
+  { name: 'Persuasion', stat: 'cha' },
+  { name: 'Sleight of Hand', stat: 'dex' },
+  { name: 'Stealth', stat: 'dex' },
+  { name: 'Survival', stat: 'wis' },
+  { name: 'Martial Arts', stat: 'str' },
+];
+
+const DEFAULT_TECHNIQUE_SCALING: TechniqueScaling = {
+  ninjutsu: 'int',
+  taijutsu: 'str',
+  genjutsu: 'wis',
+};
+
+function createDefaultSkills(): CharacterSkill[] {
+  return SKILL_DEFINITIONS.map((skill) => ({
+    ...skill,
+    proficient: false,
+    expertise: false,
+    advantage: false,
+  }));
+}
+
 export function generateStats(cr: number, specialty: NinjaSpecialty): Record<string, number> {
     // Determine the primary stat based on specialty using if statements
     let primaryStatKey: string;
@@ -387,7 +428,7 @@ export function generateWeapon(cr: number): Weapon {
 
   // Assign bonuses based on traits
   let damageBonus = 0;
-  let additionalProperties = [];
+  const additionalProperties: string[] = [];
 
   traits.forEach((trait) => {
     if (trait === 'Legendary') {
@@ -681,5 +722,7 @@ export function generateCharacter(
         weapons,
         abilities,
         proficiencyBonus,
+        skills: createDefaultSkills(),
+        techniqueScaling: { ...DEFAULT_TECHNIQUE_SCALING },
     };
 }
