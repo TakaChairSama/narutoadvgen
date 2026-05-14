@@ -58,7 +58,7 @@ const TurnOrderSidebar: React.FC<TurnOrderSidebarProps> = ({
   const submitPlayerTurn = () => {
     const initiative = Number(playerInitiative);
     if (!playerName.trim() || !Number.isFinite(initiative)) {
-      alert('Enter a player name and a valid initiative count.');
+      alert('Enter a player name and a numeric initiative count.');
       return;
     }
 

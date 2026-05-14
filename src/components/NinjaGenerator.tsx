@@ -30,6 +30,9 @@ const rollDice = (sides: number) => Math.floor(Math.random() * sides) + 1;
 const calculateModifier = (score: number) => Math.floor((score - 10) / 2);
 const levelFromCR = (cr: number) => Math.floor((cr + 1) / 2);
 const resolveClanFile = (clan: string) => String(clan).toLowerCase().replace(/\s+/g, '');
+let generatedIdCounter = 0;
+const generateId = () =>
+  globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${generatedIdCounter++}`;
 
 const rankFromCR = (cr: number): NinjaRank => {
   if (cr <= 4) return 'Genin';
@@ -198,7 +201,7 @@ const NinjaGenerator: React.FC = () => {
         : [
             ...prev,
             {
-              id: `${Date.now()}-${Math.random()}`,
+              id: generateId(),
               name: character.name,
               initiative,
               note: '',
@@ -217,7 +220,7 @@ const NinjaGenerator: React.FC = () => {
       sortTurnOrderEntries([
         ...prev,
         {
-          id: `${Date.now()}-${Math.random()}`,
+          id: generateId(),
           name,
           initiative,
           note: '',
@@ -233,7 +236,7 @@ const NinjaGenerator: React.FC = () => {
       sortTurnOrderEntries([
         ...prev,
         {
-          id: `${Date.now()}-${Math.random()}`,
+          id: generateId(),
           name,
           initiative: null,
           note: '',
@@ -319,7 +322,7 @@ const NinjaGenerator: React.FC = () => {
     const ac = 11 + (modifiers.dex ?? 0) + Math.floor(0.5 * cr) + 3;
 
     const newChar: NinjaCharacter = {
-      id: `${Date.now()}-${Math.random()}`,
+      id: generateId(),
       name: customName || `${clan} ${rank}`,
       clan,
       rank,
@@ -405,7 +408,7 @@ const NinjaGenerator: React.FC = () => {
 
       const enriched: NinjaCharacter[] = [];
       for (const raw of list) {
-        const id = raw.id || `${Date.now()}-${Math.random()}`;
+        const id = raw.id || generateId();
         const cr = Number(raw.cr ?? 1);
         const lvl = levelFromCR(cr);
         const rawClan: NinjaClan | 'None' = raw.clan && NINJA_CLANS.includes(raw.clan) ? raw.clan : 'None';
@@ -659,7 +662,7 @@ const NinjaGenerator: React.FC = () => {
 
     const initiative = Number(turnOrderInitiative);
     if (!Number.isFinite(initiative)) {
-      alert('Enter a valid initiative count.');
+      alert('Enter a numeric initiative count before adding this character.');
       return;
     }
 
