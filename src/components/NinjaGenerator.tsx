@@ -218,7 +218,6 @@ const sortTurnOrderEntries = (entries: TurnOrderEntry[]) =>
 const NinjaGenerator: React.FC = () => {
   const [characters, setCharacters] = useState<NinjaCharacter[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
-  const showGenerator = true;
   const [turnOrderEntries, setTurnOrderEntries] = useState<TurnOrderEntry[]>([]);
   const [isTurnOrderCollapsed, setIsTurnOrderCollapsed] = useState(false);
   const [turnOrderCharacterId, setTurnOrderCharacterId] = useState<string | null>(null);
@@ -936,96 +935,94 @@ const NinjaGenerator: React.FC = () => {
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
           <div className="min-w-0 flex-1">
             {/* Generator Form */}
-            {showGenerator && (
-              <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h2 className="text-2xl font-bold mb-4 text-gray-800">Create New Character</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Custom Name (Optional)</label>
-                    <input
-                      type="text"
-                      value={customName}
-                      onChange={(e) => setCustomName(e.target.value)}
-                      className="w-full p-2 border rounded"
-                      placeholder="Leave blank for auto-name"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Clan</label>
-                    <select
-                      value={clan}
-                      onChange={(e) => setClan(e.target.value as NinjaClan)}
-                      className="w-full p-2 border rounded"
-                    >
-                      <option value="None">None</option>
-                      {NINJA_CLANS.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Rank</label>
-                    <select
-                      value={rank}
-                      onChange={(e) => setRank(e.target.value as NinjaRank)}
-                      className="w-full p-2 border rounded"
-                    >
-                      {NINJA_RANKS.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Specialty</label>
-                    <select
-                      value={specialty}
-                      onChange={(e) => setSpecialty(e.target.value as NinjaSpecialty)}
-                      className="w-full p-2 border rounded"
-                    >
-                      {NINJA_SPECIALTIES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Chakra Natures</label>
-                    <div className="flex flex-wrap gap-2">
-                      {CHAKRA_NATURES.map((nature) => (
-                        <button
-                          type="button"
-                          key={nature}
-                          onClick={() => handleNatureToggle(nature)}
-                          className={`px-4 py-2 rounded transition ${
-                            selectedNatures.includes(nature)
-                              ? 'bg-orange-500 text-white'
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }`}
-                        >
-                          {nature}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-800">Create New Character</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Custom Name (Optional)</label>
+                  <input
+                    type="text"
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    placeholder="Leave blank for auto-name"
+                  />
                 </div>
 
-                <button
-                  onClick={handleGenerate}
-                  className="mt-4 w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-semibold"
-                >
-                  Generate Character
-                </button>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Clan</label>
+                  <select
+                    value={clan}
+                    onChange={(e) => setClan(e.target.value as NinjaClan)}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="None">None</option>
+                    {NINJA_CLANS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Rank</label>
+                  <select
+                    value={rank}
+                    onChange={(e) => setRank(e.target.value as NinjaRank)}
+                    className="w-full p-2 border rounded"
+                  >
+                    {NINJA_RANKS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Specialty</label>
+                  <select
+                    value={specialty}
+                    onChange={(e) => setSpecialty(e.target.value as NinjaSpecialty)}
+                    className="w-full p-2 border rounded"
+                  >
+                    {NINJA_SPECIALTIES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2">Chakra Natures</label>
+                  <div className="flex flex-wrap gap-2">
+                    {CHAKRA_NATURES.map((nature) => (
+                      <button
+                        type="button"
+                        key={nature}
+                        onClick={() => handleNatureToggle(nature)}
+                        className={`px-4 py-2 rounded transition ${
+                          selectedNatures.includes(nature)
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {nature}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            )}
+
+              <button
+                onClick={handleGenerate}
+                className="mt-4 w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-semibold"
+              >
+                Generate Character
+              </button>
+            </div>
 
             {/* Character Tabs */}
             {characters.length > 0 && (
@@ -1620,14 +1617,6 @@ const NinjaGenerator: React.FC = () => {
           </div>
         )}
 
-            {characters.length === 0 && !showGenerator && (
-              <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-xl text-gray-600">
-                  No characters yet. Generate your first ninja!
-                </p>
-              </div>
-            )}
           </div>
 
           <TurnOrderSidebar
