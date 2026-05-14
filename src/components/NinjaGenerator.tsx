@@ -112,6 +112,12 @@ const calculateTechniqueValues = (
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+const getSkillProficiencyMultiplier = (skill: CharacterSkill) => {
+  if (skill.expertise) return 2;
+  if (skill.proficient) return 1;
+  return 0;
+};
+
 const ALLOWED_RANKS: Record<NinjaRank, Array<'E' | 'D' | 'C' | 'B' | 'A' | 'S'>> = {
   Genin: ['E', 'D'],
   Chunin: ['E', 'D', 'C'],
@@ -212,7 +218,7 @@ const sortTurnOrderEntries = (entries: TurnOrderEntry[]) =>
 const NinjaGenerator: React.FC = () => {
   const [characters, setCharacters] = useState<NinjaCharacter[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
-  const [showGenerator] = useState(true);
+  const showGenerator = true;
   const [turnOrderEntries, setTurnOrderEntries] = useState<TurnOrderEntry[]>([]);
   const [isTurnOrderCollapsed, setIsTurnOrderCollapsed] = useState(false);
   const [turnOrderCharacterId, setTurnOrderCharacterId] = useState<string | null>(null);
@@ -1323,7 +1329,7 @@ const NinjaGenerator: React.FC = () => {
                       <h4 className="font-bold mb-3">Skills</h4>
                       <div className="space-y-2 max-h-96 overflow-y-auto">
                         {activeCharacter.skills.map((skill) => {
-                          const multiplier = skill.expertise ? 2 : skill.proficient ? 1 : 0;
+                          const multiplier = getSkillProficiencyMultiplier(skill);
                           const totalBonus =
                             (activeCharacter.modifiers[skill.stat] ?? 0) +
                             activeCharacter.proficiencyBonus * multiplier;
