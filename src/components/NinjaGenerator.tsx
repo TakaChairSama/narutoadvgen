@@ -2,12 +2,16 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Scroll, Users, Upload, X, Plus } from 'lucide-react';
 import TurnOrderSidebar, { type TurnOrderEntry } from './TurnOrderSidebar';
 import type {
+  AbilityStat,
   ChakraNature,
+  CharacterSkill,
+  TechniqueScaling,
   NinjaRank,
   NinjaSpecialty,
   NinjaClan,
   Jutsu as JutsuType,
   ClanFeature,
+  Weapon,
 } from '../types/naruto';
 import {
   CHAKRA_NATURES,
@@ -24,12 +28,19 @@ import {
   getChakraWeaponByName,
   searchChakraWeapons,
 } from '../data/chakraWeapons';
+import {
+  ABILITY_STATS,
+  createDefaultSkills,
+  DEFAULT_TECHNIQUE_SCALING,
+  SKILL_DEFINITIONS,
+} from '../utils/characterData';
 
 // helpers
 const rollDice = (sides: number) => Math.floor(Math.random() * sides) + 1;
 const calculateModifier = (score: number) => Math.floor((score - 10) / 2);
 const levelFromCR = (cr: number) => Math.floor((cr + 1) / 2);
 const resolveClanFile = (clan: string) => String(clan).toLowerCase().replace(/\s+/g, '');
+const getProficiencyBonus = (cr: number) => Math.floor((Math.max(1, cr) - 1) / 4) + 2;
 
 const rankFromCR = (cr: number): NinjaRank => {
   if (cr <= 4) return 'Genin';
@@ -39,13 +50,72 @@ const rankFromCR = (cr: number): NinjaRank => {
   return 'Kage';
 };
 
-const specialtyStatKey = (spec: NinjaSpecialty): keyof Record<string, number> => {
+const specialtyStatKey = (spec: NinjaSpecialty): AbilityStat => {
   if (spec === 'Ninjutsu') return 'int';
   if (spec === 'Genjutsu') return 'wis';
   if (spec === 'Taijutsu') return 'str';
   if (spec === 'Bukijutsu') return 'dex';
   if (spec === 'Fuinjutsu') return 'int';
   return 'int';
+};
+
+const normalizeTechniqueScaling = (rawScaling: unknown): TechniqueScaling => {
+  const source = rawScaling && typeof rawScaling === 'object' ? (rawScaling as Record<string, unknown>) : {};
+  return {
+    ninjutsu: ABILITY_STATS.includes(source.ninjutsu as AbilityStat)
+      ? (source.ninjutsu as AbilityStat)
+      : DEFAULT_TECHNIQUE_SCALING.ninjutsu,
+    taijutsu: ABILITY_STATS.includes(source.taijutsu as AbilityStat)
+      ? (source.taijutsu as AbilityStat)
+      : DEFAULT_TECHNIQUE_SCALING.taijutsu,
+    genjutsu: ABILITY_STATS.includes(source.genjutsu as AbilityStat)
+      ? (source.genjutsu as AbilityStat)
+      : DEFAULT_TECHNIQUE_SCALING.genjutsu,
+  };
+};
+
+const normalizeSkills = (rawSkills: unknown): CharacterSkill[] => {
+  const source = Array.isArray(rawSkills) ? rawSkills : [];
+  return SKILL_DEFINITIONS.map((skill) => {
+    const imported = source.find((entry) => entry?.name === skill.name) as Partial<CharacterSkill> | undefined;
+    const proficient = Boolean(imported?.proficient || imported?.expertise);
+    const expertise = Boolean(imported?.expertise);
+    return {
+      ...skill,
+      proficient,
+      expertise,
+      advantage: Boolean(imported?.advantage),
+    };
+  });
+};
+
+const calculateTechniqueValues = (
+  modifiers: Record<string, number>,
+  proficiencyBonus: number,
+  techniqueScaling: TechniqueScaling
+) => {
+  const getTechniqueBonus = (stat: AbilityStat) => proficiencyBonus + (modifiers[stat] ?? 0);
+  return {
+    attackMods: {
+      ninjutsu: getTechniqueBonus(techniqueScaling.ninjutsu),
+      taijutsu: getTechniqueBonus(techniqueScaling.taijutsu),
+      genjutsu: getTechniqueBonus(techniqueScaling.genjutsu),
+    },
+    saveDCs: {
+      ninjutsu: 8 + getTechniqueBonus(techniqueScaling.ninjutsu),
+      taijutsu: 8 + getTechniqueBonus(techniqueScaling.taijutsu),
+      genjutsu: 8 + getTechniqueBonus(techniqueScaling.genjutsu),
+    },
+  };
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const getSkillProficiencyMultiplier = (skill: CharacterSkill) => {
+  if (skill.expertise) return 2;
+  if (skill.proficient) return 1;
+  return 0;
 };
 
 const ALLOWED_RANKS: Record<NinjaRank, Array<'E' | 'D' | 'C' | 'B' | 'A' | 'S'>> = {
@@ -76,7 +146,8 @@ async function loadClanFeatures(clan: NinjaClan | 'None'): Promise<ClanFeature[]
     const file = resolveClanFile(clan);
     const mod = await import(`../data/clans/${file}`);
     const featuresKey = Object.keys(mod).find((k) => /features$/i.test(k));
-    const features = (featuresKey ? (mod as any)[featuresKey] : []) as unknown;
+    const moduleRecord = mod as Record<string, unknown>;
+    const features = featuresKey ? moduleRecord[featuresKey] : [];
     return Array.isArray(features) ? (features as ClanFeature[]) : [];
   } catch {
     return [];
@@ -103,9 +174,21 @@ interface NinjaCharacter {
   jutsu: JutsuType[];
   clanFeatures: ClanFeature[];
   clanJutsu: JutsuType[];
-  weapons: any[];
+  weapons: Weapon[];
   abilities: string[];
   proficiencyBonus: number;
+  attackMods: {
+    ninjutsu: number;
+    taijutsu: number;
+    genjutsu: number;
+  };
+  saveDCs: {
+    ninjutsu: number;
+    taijutsu: number;
+    genjutsu: number;
+  };
+  skills: CharacterSkill[];
+  techniqueScaling: TechniqueScaling;
   baseStats?: Record<string, number>;
   baseCR?: number;
   chakraWeapons?: ChakraWeapon[];
@@ -135,7 +218,6 @@ const sortTurnOrderEntries = (entries: TurnOrderEntry[]) =>
 const NinjaGenerator: React.FC = () => {
   const [characters, setCharacters] = useState<NinjaCharacter[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
-  const [showGenerator, setShowGenerator] = useState(true);
   const [turnOrderEntries, setTurnOrderEntries] = useState<TurnOrderEntry[]>([]);
   const [isTurnOrderCollapsed, setIsTurnOrderCollapsed] = useState(false);
   const [turnOrderCharacterId, setTurnOrderCharacterId] = useState<string | null>(null);
@@ -287,7 +369,13 @@ const NinjaGenerator: React.FC = () => {
     const modifiers = Object.fromEntries(
       Object.entries(stats).map(([k, v]) => [k, calculateModifier(v)])
     ) as Record<string, number>;
-    const proficiencyBonus = Math.floor((cr - 1) / 4) + 2;
+    const proficiencyBonus = getProficiencyBonus(cr);
+    const techniqueScaling = { ...DEFAULT_TECHNIQUE_SCALING };
+    const { attackMods, saveDCs } = calculateTechniqueValues(
+      modifiers,
+      proficiencyBonus,
+      techniqueScaling
+    );
     const conMod = modifiers.con ?? 0;
     const baseHP = Array.from({ length: cr }, () => rollDice(12)).reduce((a, b) => a + b, 0);
     const totalHP = baseHP + conMod * cr + 10 + conMod;
@@ -351,6 +439,10 @@ const NinjaGenerator: React.FC = () => {
       weapons,
       abilities: abilityStrings,
       proficiencyBonus,
+      attackMods,
+      saveDCs,
+      skills: createDefaultSkills(),
+      techniqueScaling,
       baseStats: { ...stats },
       baseCR: cr,
       chakraWeapons: [],
@@ -411,15 +503,22 @@ const NinjaGenerator: React.FC = () => {
     if (!importText) return;
     try {
       const parsed = JSON.parse(importText);
-      const list: any[] = Array.isArray(parsed) ? parsed : [parsed];
+      const list: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
 
       const enriched: NinjaCharacter[] = [];
       for (const raw of list) {
-        const id = raw.id || generateId();
+        if (!isRecord(raw)) continue;
+        const id = typeof raw.id === 'string' ? raw.id : generateId();
         const cr = Number(raw.cr ?? 1);
         const lvl = levelFromCR(cr);
-        const rawClan: NinjaClan | 'None' = raw.clan && NINJA_CLANS.includes(raw.clan) ? raw.clan : 'None';
-        const rawRank: NinjaRank = raw.rank && NINJA_RANKS.includes(raw.rank) ? raw.rank : rankFromCR(cr);
+        const rawClan: NinjaClan | 'None' =
+          typeof raw.clan === 'string' && NINJA_CLANS.includes(raw.clan as NinjaClan)
+            ? (raw.clan as NinjaClan)
+            : 'None';
+        const rawRank: NinjaRank =
+          typeof raw.rank === 'string' && NINJA_RANKS.includes(raw.rank as NinjaRank)
+            ? (raw.rank as NinjaRank)
+            : rankFromCR(cr);
 
         const abilityStrings =
           rawClan && rawClan !== 'None' ? getClanFeatures(rawClan as NinjaClan, lvl) : ([] as string[]);
@@ -448,6 +547,14 @@ const NinjaGenerator: React.FC = () => {
           Object.fromEntries(
             Object.entries(stats).map(([k, v]) => [k, calculateModifier(Math.floor(Number(v) || 10))])
           );
+        const proficiencyBonus = getProficiencyBonus(cr);
+        const techniqueScaling = normalizeTechniqueScaling(raw.techniqueScaling);
+        const { attackMods, saveDCs } = calculateTechniqueValues(
+          modifiers as Record<string, number>,
+          proficiencyBonus,
+          techniqueScaling
+        );
+        const skills = normalizeSkills(raw.skills);
 
         // AC progression from imported Level
         const ac = 11 + (modifiers.dex ?? 0) + Math.floor(0.5 * cr) + 3;
@@ -456,18 +563,20 @@ const NinjaGenerator: React.FC = () => {
         let chakraWeapons: ChakraWeapon[] | undefined = undefined;
         if (Array.isArray(raw.chakraWeapons)) {
           chakraWeapons = raw.chakraWeapons
-            .map((cw: any) => {
+            .map((cw: unknown) => {
               if (typeof cw === 'string') {
                 const found = getChakraWeaponByName(cw);
                 if (found) return found;
                 return { name: cw, description: '' } as ChakraWeapon;
-              } else if (cw && typeof cw === 'object' && cw.name) {
+              } else if (isRecord(cw) && typeof cw.name === 'string') {
                 const fromLib = getChakraWeaponByName(cw.name);
                 return {
                   ...fromLib,
                   ...cw,
                   name: cw.name,
-                  description: cw.description ?? fromLib?.description ?? '',
+                  description:
+                    (typeof cw.description === 'string' ? cw.description : fromLib?.description) ??
+                    '',
                 } as ChakraWeapon;
               }
               return null;
@@ -499,7 +608,11 @@ const NinjaGenerator: React.FC = () => {
           clanJutsu: clanJutsuList,
           weapons: Array.isArray(raw.weapons) ? raw.weapons : [],
           abilities: Array.isArray(raw.abilities) ? raw.abilities : abilityStrings,
-          proficiencyBonus: Number(raw.proficiencyBonus || Math.floor((cr - 1) / 4) + 2),
+          proficiencyBonus,
+          attackMods,
+          saveDCs,
+          skills,
+          techniqueScaling,
           baseStats: raw.baseStats || { ...stats },
           baseCR: Number(raw.baseCR ?? cr),
           chakraWeapons,
@@ -541,7 +654,7 @@ const NinjaGenerator: React.FC = () => {
 
     const newRank = rankFromCR(newCR);
     const lvl = levelFromCR(newCR);
-    const prof = Math.floor((newCR - 1) / 4) + 2;
+    const prof = getProficiencyBonus(newCR);
 
     // Prepare base stats
     const baseStats = current.baseStats ?? { ...current.stats };
@@ -551,8 +664,8 @@ const NinjaGenerator: React.FC = () => {
     const specKey = specialtyStatKey(current.specialty);
     const levelDiff = newCR - baseCR;
     const newStats: Record<string, number> = { ...baseStats };
-    for (const key of ['str', 'dex', 'con', 'int', 'wis', 'cha']) {
-      if (typeof (newStats as any)[key] !== 'number') (newStats as any)[key] = 10;
+    for (const key of ABILITY_STATS) {
+      if (typeof newStats[key] !== 'number') newStats[key] = 10;
     }
     newStats[specKey] = (newStats[specKey] ?? 10) + 0.5 * levelDiff;
     newStats['con'] = (newStats['con'] ?? 10) + 0.5 * levelDiff;
@@ -560,6 +673,11 @@ const NinjaGenerator: React.FC = () => {
     const newModifiers = Object.fromEntries(
       Object.entries(newStats).map(([k, v]) => [k, calculateModifier(Math.floor(v))])
     ) as Record<string, number>;
+    const { attackMods, saveDCs } = calculateTechniqueValues(
+      newModifiers,
+      prof,
+      current.techniqueScaling
+    );
 
     // HP/Chakra change per level step
     const hpStep = rollDice(12) + (newModifiers.con ?? 0);
@@ -584,10 +702,10 @@ const NinjaGenerator: React.FC = () => {
     const allowed = new Set(ALLOWED_RANKS[newRank]);
     const clanNames = new Set(newClanJutsu.map((j) => j.name));
     const filteredJutsu = current.jutsu.filter(
-      (j) => allowed.has((j.rank as any) || 'D') || clanNames.has(j.name)
+      (j) => allowed.has(j.rank as 'E' | 'D' | 'C' | 'B' | 'A' | 'S') || clanNames.has(j.name)
     );
 
-    let finalJutsu = [...filteredJutsu];
+    const finalJutsu = [...filteredJutsu];
     if (delta === 1 && [5, 9, 13, 17].includes(newCR)) {
       const pool = getJutsu(newRank, current.specialty, current.chakraNatures);
       const existing = new Set(finalJutsu.map((j) => j.name));
@@ -647,6 +765,8 @@ const NinjaGenerator: React.FC = () => {
       abilities: newAbilities,
       clanFeatures: newStructuredFeatures,
       proficiencyBonus: prof,
+      attackMods,
+      saveDCs,
       ac: newAC,
       baseStats: current.baseStats ?? { ...current.stats },
       baseCR: typeof current.baseCR === 'number' ? current.baseCR : current.cr,
@@ -708,6 +828,59 @@ const NinjaGenerator: React.FC = () => {
     );
   };
 
+  const updateTechniqueScaling = (
+    id: string,
+    technique: keyof TechniqueScaling,
+    stat: AbilityStat
+  ) => {
+    setCharacters((prev) =>
+      prev.map((character) => {
+        if (character.id !== id) return character;
+        const techniqueScaling = { ...character.techniqueScaling, [technique]: stat };
+        const { attackMods, saveDCs } = calculateTechniqueValues(
+          character.modifiers,
+          character.proficiencyBonus,
+          techniqueScaling
+        );
+        return { ...character, techniqueScaling, attackMods, saveDCs };
+      })
+    );
+  };
+
+  const updateSkillState = (
+    id: string,
+    skillName: string,
+    field: 'proficient' | 'expertise' | 'advantage',
+    value: boolean
+  ) => {
+    setCharacters((prev) =>
+      prev.map((character) => {
+        if (character.id !== id) return character;
+        return {
+          ...character,
+          skills: character.skills.map((skill) => {
+            if (skill.name !== skillName) return skill;
+            if (field === 'proficient') {
+              return {
+                ...skill,
+                proficient: value,
+                expertise: value && skill.expertise,
+              };
+            }
+            if (field === 'expertise') {
+              return {
+                ...skill,
+                expertise: value,
+                proficient: value || skill.proficient,
+              };
+            }
+            return { ...skill, advantage: value };
+          }),
+        };
+      })
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
       <div className="container mx-auto p-4 max-w-7xl">
@@ -762,96 +935,94 @@ const NinjaGenerator: React.FC = () => {
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
           <div className="min-w-0 flex-1">
             {/* Generator Form */}
-            {showGenerator && (
-              <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h2 className="text-2xl font-bold mb-4 text-gray-800">Create New Character</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Custom Name (Optional)</label>
-                    <input
-                      type="text"
-                      value={customName}
-                      onChange={(e) => setCustomName(e.target.value)}
-                      className="w-full p-2 border rounded"
-                      placeholder="Leave blank for auto-name"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Clan</label>
-                    <select
-                      value={clan}
-                      onChange={(e) => setClan(e.target.value as NinjaClan)}
-                      className="w-full p-2 border rounded"
-                    >
-                      <option value="None">None</option>
-                      {NINJA_CLANS.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Rank</label>
-                    <select
-                      value={rank}
-                      onChange={(e) => setRank(e.target.value as NinjaRank)}
-                      className="w-full p-2 border rounded"
-                    >
-                      {NINJA_RANKS.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Specialty</label>
-                    <select
-                      value={specialty}
-                      onChange={(e) => setSpecialty(e.target.value as NinjaSpecialty)}
-                      className="w-full p-2 border rounded"
-                    >
-                      {NINJA_SPECIALTIES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Chakra Natures</label>
-                    <div className="flex flex-wrap gap-2">
-                      {CHAKRA_NATURES.map((nature) => (
-                        <button
-                          type="button"
-                          key={nature}
-                          onClick={() => handleNatureToggle(nature)}
-                          className={`px-4 py-2 rounded transition ${
-                            selectedNatures.includes(nature)
-                              ? 'bg-orange-500 text-white'
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }`}
-                        >
-                          {nature}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-800">Create New Character</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Custom Name (Optional)</label>
+                  <input
+                    type="text"
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    placeholder="Leave blank for auto-name"
+                  />
                 </div>
 
-                <button
-                  onClick={handleGenerate}
-                  className="mt-4 w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-semibold"
-                >
-                  Generate Character
-                </button>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Clan</label>
+                  <select
+                    value={clan}
+                    onChange={(e) => setClan(e.target.value as NinjaClan)}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="None">None</option>
+                    {NINJA_CLANS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Rank</label>
+                  <select
+                    value={rank}
+                    onChange={(e) => setRank(e.target.value as NinjaRank)}
+                    className="w-full p-2 border rounded"
+                  >
+                    {NINJA_RANKS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Specialty</label>
+                  <select
+                    value={specialty}
+                    onChange={(e) => setSpecialty(e.target.value as NinjaSpecialty)}
+                    className="w-full p-2 border rounded"
+                  >
+                    {NINJA_SPECIALTIES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2">Chakra Natures</label>
+                  <div className="flex flex-wrap gap-2">
+                    {CHAKRA_NATURES.map((nature) => (
+                      <button
+                        type="button"
+                        key={nature}
+                        onClick={() => handleNatureToggle(nature)}
+                        className={`px-4 py-2 rounded transition ${
+                          selectedNatures.includes(nature)
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {nature}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            )}
+
+              <button
+                onClick={handleGenerate}
+                className="mt-4 w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-semibold"
+              >
+                Generate Character
+              </button>
+            </div>
 
             {/* Character Tabs */}
             {characters.length > 0 && (
@@ -978,6 +1149,10 @@ const NinjaGenerator: React.FC = () => {
                         <div>
                           <span className="font-semibold">Speed:</span> {activeCharacter.speed}ft
                         </div>
+                        <div>
+                          <span className="font-semibold">Prof. Bonus:</span>{' '}
+                          +{activeCharacter.proficiencyBonus}
+                        </div>
                       </div>
                     </div>
 
@@ -1100,6 +1275,125 @@ const NinjaGenerator: React.FC = () => {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-lg">
+                      <h4 className="font-bold mb-3">Technique Bonuses &amp; DCs</h4>
+                      <div className="space-y-3">
+                        {(['ninjutsu', 'taijutsu', 'genjutsu'] as const).map((technique) => (
+                          <div key={technique} className="rounded bg-white p-3">
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                              <div>
+                                <div className="font-semibold capitalize">{technique}</div>
+                                <div className="text-sm text-gray-600">
+                                  Bonus{' '}
+                                  <span className="font-medium">
+                                    {activeCharacter.attackMods[technique] >= 0 ? '+' : ''}
+                                    {activeCharacter.attackMods[technique]}
+                                  </span>{' '}
+                                  • DC{' '}
+                                  <span className="font-medium">{activeCharacter.saveDCs[technique]}</span>
+                                </div>
+                              </div>
+                              <label className="flex items-center gap-2 text-sm">
+                                <span className="text-gray-600">Scaling Stat</span>
+                                <select
+                                  value={activeCharacter.techniqueScaling[technique]}
+                                  onChange={(event) =>
+                                    updateTechniqueScaling(
+                                      activeCharacter.id,
+                                      technique,
+                                      event.target.value as AbilityStat
+                                    )
+                                  }
+                                  className="rounded border px-2 py-1 uppercase"
+                                >
+                                  {ABILITY_STATS.map((stat) => (
+                                    <option key={stat} value={stat}>
+                                      {stat.toUpperCase()}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-cyan-50 p-4 rounded-lg">
+                      <h4 className="font-bold mb-3">Skills</h4>
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {activeCharacter.skills.map((skill) => {
+                          const multiplier = getSkillProficiencyMultiplier(skill);
+                          const totalBonus =
+                            (activeCharacter.modifiers[skill.stat] ?? 0) +
+                            activeCharacter.proficiencyBonus * multiplier;
+                          return (
+                            <div
+                              key={skill.name}
+                              className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded bg-white p-3"
+                            >
+                              <div>
+                                <div className="font-medium">{skill.name}</div>
+                                <div className="text-sm text-gray-600">
+                                  {skill.stat.toUpperCase()} •{' '}
+                                  {totalBonus >= 0 ? '+' : ''}
+                                  {totalBonus}
+                                  {skill.advantage ? ' • Advantage' : ''}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap items-center justify-end gap-3 text-xs sm:text-sm">
+                                <label className="flex items-center gap-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={skill.proficient}
+                                    onChange={(event) =>
+                                      updateSkillState(
+                                        activeCharacter.id,
+                                        skill.name,
+                                        'proficient',
+                                        event.target.checked
+                                      )
+                                    }
+                                  />
+                                  Prof.
+                                </label>
+                                <label className="flex items-center gap-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={skill.expertise}
+                                    onChange={(event) =>
+                                      updateSkillState(
+                                        activeCharacter.id,
+                                        skill.name,
+                                        'expertise',
+                                        event.target.checked
+                                      )
+                                    }
+                                  />
+                                  Double
+                                </label>
+                                <label className="flex items-center gap-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={skill.advantage}
+                                    onChange={(event) =>
+                                      updateSkillState(
+                                        activeCharacter.id,
+                                        skill.name,
+                                        'advantage',
+                                        event.target.checked
+                                      )
+                                    }
+                                  />
+                                  Adv.
+                                </label>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1323,14 +1617,6 @@ const NinjaGenerator: React.FC = () => {
           </div>
         )}
 
-            {characters.length === 0 && !showGenerator && (
-              <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-xl text-gray-600">
-                  No characters yet. Generate your first ninja!
-                </p>
-              </div>
-            )}
           </div>
 
           <TurnOrderSidebar

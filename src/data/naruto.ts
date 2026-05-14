@@ -3,8 +3,6 @@ import {
   NinjaClan,
   NinjaRank,
   NinjaSpecialty,
-  Jutsu,
-  Weapon,
 } from '../types/naruto';
 
 export const CHAKRA_NATURES: ChakraNature[] = [

@@ -1,4 +1,5 @@
 import {
+  ClanFeature,
   NinjaCharacter,
   NinjaClan,
   NinjaRank,
@@ -12,12 +13,11 @@ import {
   CR_RANGES,
   XP_BY_CR,
   CLAN_ABILITIES,
-  BASE_JUTSU,
   WEAPON_TYPES,
   WEAPON_TRAITS,
-  WEAPON_PROPERTIES,
 } from '../data/naruto';
 import { getJutsu as getJutsuFromLibrary } from '../data/jutsuLibrary';
+import { createDefaultSkills, DEFAULT_TECHNIQUE_SCALING } from './characterData';
 
 export { getJutsu } from '../data/jutsuLibrary';
 
@@ -61,7 +61,7 @@ import {
 const CLAN_DATA = new Map<
   NinjaClan,
   {
-    features: any[];
+    features: ClanFeature[];
     jutsu: ClanJutsu[];
   }
 >();
@@ -387,7 +387,7 @@ export function generateWeapon(cr: number): Weapon {
 
   // Assign bonuses based on traits
   let damageBonus = 0;
-  let additionalProperties = [];
+  const additionalProperties: string[] = [];
 
   traits.forEach((trait) => {
     if (trait === 'Legendary') {
@@ -681,5 +681,7 @@ export function generateCharacter(
         weapons,
         abilities,
         proficiencyBonus,
+        skills: createDefaultSkills(),
+        techniqueScaling: { ...DEFAULT_TECHNIQUE_SCALING },
     };
 }

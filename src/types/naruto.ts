@@ -2,6 +2,8 @@
 export type JutsuRank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S';
 export type ChakraNature = 'Fire' | 'Water' | 'Earth' | 'Wind' | 'Lightning';
 export type NinjaRank = 'Genin' | 'Chunin' | 'Jonin' | 'ANBU' | 'Kage';
+export type AbilityStat = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+export type TechniqueType = 'ninjutsu' | 'taijutsu' | 'genjutsu';
 export type NinjaClan =
   // Noble Clans
   | 'Uchiha'
@@ -90,6 +92,20 @@ export interface Weapon {
   description: string;
 }
 
+export interface CharacterSkill {
+  name: string;
+  stat: AbilityStat;
+  proficient: boolean;
+  expertise: boolean;
+  advantage: boolean;
+}
+
+export interface TechniqueScaling {
+  ninjutsu: AbilityStat;
+  taijutsu: AbilityStat;
+  genjutsu: AbilityStat;
+}
+
 export interface NinjaCharacter {
   name: string;
   clan: NinjaClan;
@@ -134,6 +150,8 @@ export interface NinjaCharacter {
   weapons: Weapon[];
   abilities: string[];
   proficiencyBonus: number;
+  skills: CharacterSkill[];
+  techniqueScaling: TechniqueScaling;
   clanFeatures?: string[];
 }
 
