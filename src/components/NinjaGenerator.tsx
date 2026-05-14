@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Scroll, Users, Upload, X, Plus } from 'lucide-react';
 import TurnOrderSidebar, { type TurnOrderEntry } from './TurnOrderSidebar';
 import type {
@@ -30,9 +30,6 @@ const rollDice = (sides: number) => Math.floor(Math.random() * sides) + 1;
 const calculateModifier = (score: number) => Math.floor((score - 10) / 2);
 const levelFromCR = (cr: number) => Math.floor((cr + 1) / 2);
 const resolveClanFile = (clan: string) => String(clan).toLowerCase().replace(/\s+/g, '');
-let generatedIdCounter = 0;
-const generateId = () =>
-  globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${generatedIdCounter++}`;
 
 const rankFromCR = (cr: number): NinjaRank => {
   if (cr <= 4) return 'Genin';
@@ -143,6 +140,7 @@ const NinjaGenerator: React.FC = () => {
   const [isTurnOrderCollapsed, setIsTurnOrderCollapsed] = useState(false);
   const [turnOrderCharacterId, setTurnOrderCharacterId] = useState<string | null>(null);
   const [turnOrderInitiative, setTurnOrderInitiative] = useState('');
+  const generatedIdCounter = useRef(0);
 
   // Form state
   const [clan, setClan] = useState<NinjaClan | 'None'>(NINJA_CLANS[0] || 'None');
@@ -167,6 +165,9 @@ const NinjaGenerator: React.FC = () => {
   // Chakra weapon add UI
   const [weaponQuery, setWeaponQuery] = useState('');
   const [weaponResults, setWeaponResults] = useState<ChakraWeapon[]>([]);
+
+  const generateId = () =>
+    globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${generatedIdCounter.current++}`;
 
   const resetTurnOrderCharacterForm = () => {
     setTurnOrderCharacterId(null);
