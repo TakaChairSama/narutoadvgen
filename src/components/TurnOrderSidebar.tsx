@@ -56,9 +56,14 @@ const TurnOrderSidebar: React.FC<TurnOrderSidebarProps> = ({
   );
 
   const submitPlayerTurn = () => {
+    if (!playerName.trim()) {
+      alert('Please enter a player name.');
+      return;
+    }
+
     const initiative = Number(playerInitiative);
-    if (!playerName.trim() || !Number.isFinite(initiative)) {
-      alert('Enter a player name and a numeric initiative count.');
+    if (!Number.isFinite(initiative)) {
+      alert('Please enter a numeric initiative count.');
       return;
     }
 
@@ -69,7 +74,7 @@ const TurnOrderSidebar: React.FC<TurnOrderSidebarProps> = ({
 
   const submitPlayerToEnd = () => {
     if (!playerName.trim()) {
-      alert('Enter a player name before adding them to the turn order.');
+      alert('Please enter a player name.');
       return;
     }
 

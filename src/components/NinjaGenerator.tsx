@@ -166,8 +166,14 @@ const NinjaGenerator: React.FC = () => {
   const [weaponQuery, setWeaponQuery] = useState('');
   const [weaponResults, setWeaponResults] = useState<ChakraWeapon[]>([]);
 
-  const generateId = () =>
-    globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${generatedIdCounter.current++}`;
+  const generateId = () => {
+    if (globalThis.crypto?.randomUUID) {
+      return globalThis.crypto.randomUUID();
+    }
+
+    generatedIdCounter.current += 1;
+    return `id-${Date.now()}-${generatedIdCounter.current}-${Math.random().toString(36).slice(2, 10)}`;
+  };
 
   const resetTurnOrderCharacterForm = () => {
     setTurnOrderCharacterId(null);
