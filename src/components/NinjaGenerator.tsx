@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Scroll, Users, Upload, X, Plus } from 'lucide-react';
+import TurnOrderSidebar, { type TurnOrderEntry } from './TurnOrderSidebar';
 import type {
   ChakraNature,
   NinjaRank,
@@ -110,10 +111,35 @@ interface NinjaCharacter {
   chakraWeapons?: ChakraWeapon[];
 }
 
+const sortTurnOrderEntries = (entries: TurnOrderEntry[]) =>
+  [...entries].sort((left, right) => {
+    if (left.initiative === null && right.initiative === null) {
+      return left.addedAt - right.addedAt;
+    }
+
+    if (left.initiative === null) {
+      return 1;
+    }
+
+    if (right.initiative === null) {
+      return -1;
+    }
+
+    if (left.initiative !== right.initiative) {
+      return right.initiative - left.initiative;
+    }
+
+    return left.addedAt - right.addedAt;
+  });
+
 const NinjaGenerator: React.FC = () => {
   const [characters, setCharacters] = useState<NinjaCharacter[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [showGenerator, setShowGenerator] = useState(true);
+  const [turnOrderEntries, setTurnOrderEntries] = useState<TurnOrderEntry[]>([]);
+  const [isTurnOrderCollapsed, setIsTurnOrderCollapsed] = useState(false);
+  const [turnOrderCharacterId, setTurnOrderCharacterId] = useState<string | null>(null);
+  const [turnOrderInitiative, setTurnOrderInitiative] = useState('');
 
   // Form state
   const [clan, setClan] = useState<NinjaClan | 'None'>(NINJA_CLANS[0] || 'None');
@@ -138,6 +164,95 @@ const NinjaGenerator: React.FC = () => {
   // Chakra weapon add UI
   const [weaponQuery, setWeaponQuery] = useState('');
   const [weaponResults, setWeaponResults] = useState<ChakraWeapon[]>([]);
+
+  const resetTurnOrderCharacterForm = () => {
+    setTurnOrderCharacterId(null);
+    setTurnOrderInitiative('');
+  };
+
+  const openTurnOrderCharacterForm = (characterId: string) => {
+    const existingEntry = turnOrderEntries.find((entry) => entry.characterId === characterId);
+    setTurnOrderCharacterId(characterId);
+    setTurnOrderInitiative(
+      typeof existingEntry?.initiative === 'number' ? String(existingEntry.initiative) : ''
+    );
+  };
+
+  const addCharacterToTurnOrder = (characterId: string, initiative: number) => {
+    const character = characters.find((entry) => entry.id === characterId);
+    if (!character) return;
+
+    setTurnOrderEntries((prev) => {
+      const existingEntry = prev.find((entry) => entry.characterId === characterId);
+
+      const nextEntries = existingEntry
+        ? prev.map((entry) =>
+            entry.id === existingEntry.id
+              ? {
+                  ...entry,
+                  name: character.name,
+                  initiative,
+                }
+              : entry
+          )
+        : [
+            ...prev,
+            {
+              id: `${Date.now()}-${Math.random()}`,
+              name: character.name,
+              initiative,
+              note: '',
+              addedAt: Date.now(),
+              type: 'character' as const,
+              characterId,
+            },
+          ];
+
+      return sortTurnOrderEntries(nextEntries);
+    });
+  };
+
+  const addPlayerTurn = (name: string, initiative: number) => {
+    setTurnOrderEntries((prev) =>
+      sortTurnOrderEntries([
+        ...prev,
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          name,
+          initiative,
+          note: '',
+          addedAt: Date.now(),
+          type: 'player',
+        },
+      ])
+    );
+  };
+
+  const addPlayerToEnd = (name: string) => {
+    setTurnOrderEntries((prev) =>
+      sortTurnOrderEntries([
+        ...prev,
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          name,
+          initiative: null,
+          note: '',
+          addedAt: Date.now(),
+          type: 'player',
+        },
+      ])
+    );
+  };
+
+  const removeTurnOrderEntry = (entryId: string) => {
+    setTurnOrderEntries((prev) => prev.filter((entry) => entry.id !== entryId));
+  };
+
+  const updateTurnOrderEntryNote = (entryId: string, note: string) => {
+    setTurnOrderEntries((prev) =>
+      prev.map((entry) => (entry.id === entryId ? { ...entry, note } : entry))
+    );
+  };
 
   const handleNatureToggle = (nature: ChakraNature) => {
     setSelectedNatures((prev) =>
@@ -237,8 +352,17 @@ const NinjaGenerator: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
-    setCharacters((prev) => prev.filter((c) => c.id !== id));
-    if (activeTab === id) setActiveTab(characters[0]?.id || null);
+    const remainingCharacters = characters.filter((character) => character.id !== id);
+    setCharacters(remainingCharacters);
+    setTurnOrderEntries((prev) => prev.filter((entry) => entry.characterId !== id));
+
+    if (turnOrderCharacterId === id) {
+      resetTurnOrderCharacterForm();
+    }
+
+    if (activeTab === id) {
+      setActiveTab(remainingCharacters[0]?.id || null);
+    }
   };
 
   // Typed deltas
@@ -522,6 +646,26 @@ const NinjaGenerator: React.FC = () => {
   };
 
   const activeCharacter = characters.find((c) => c.id === activeTab);
+  const activeCharacterTurnOrderEntry = useMemo(
+    () =>
+      activeCharacter
+        ? turnOrderEntries.find((entry) => entry.characterId === activeCharacter.id)
+        : undefined,
+    [activeCharacter, turnOrderEntries]
+  );
+
+  const submitCharacterTurnOrder = () => {
+    if (!turnOrderCharacterId) return;
+
+    const initiative = Number(turnOrderInitiative);
+    if (!Number.isFinite(initiative)) {
+      alert('Enter a valid initiative count.');
+      return;
+    }
+
+    addCharacterToTurnOrder(turnOrderCharacterId, initiative);
+    resetTurnOrderCharacterForm();
+  };
 
   // Chakra weapon search
   const onSearchWeapons = (q: string) => {
@@ -605,123 +749,127 @@ const NinjaGenerator: React.FC = () => {
           )}
         </div>
 
-        {/* Generator Form */}
-        {showGenerator && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-2xl font-bold mb-4 text-gray-800">Create New Character</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Custom Name (Optional)</label>
-                <input
-                  type="text"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  className="w-full p-2 border rounded"
-                  placeholder="Leave blank for auto-name"
-                />
-              </div>
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+          <div className="min-w-0 flex-1">
+            {/* Generator Form */}
+            {showGenerator && (
+              <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 className="text-2xl font-bold mb-4 text-gray-800">Create New Character</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Custom Name (Optional)</label>
+                    <input
+                      type="text"
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      className="w-full p-2 border rounded"
+                      placeholder="Leave blank for auto-name"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Clan</label>
-                <select
-                  value={clan}
-                  onChange={(e) => setClan(e.target.value as NinjaClan)}
-                  className="w-full p-2 border rounded"
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Clan</label>
+                    <select
+                      value={clan}
+                      onChange={(e) => setClan(e.target.value as NinjaClan)}
+                      className="w-full p-2 border rounded"
+                    >
+                      <option value="None">None</option>
+                      {NINJA_CLANS.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Rank</label>
+                    <select
+                      value={rank}
+                      onChange={(e) => setRank(e.target.value as NinjaRank)}
+                      className="w-full p-2 border rounded"
+                    >
+                      {NINJA_RANKS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Specialty</label>
+                    <select
+                      value={specialty}
+                      onChange={(e) => setSpecialty(e.target.value as NinjaSpecialty)}
+                      className="w-full p-2 border rounded"
+                    >
+                      {NINJA_SPECIALTIES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Chakra Natures</label>
+                    <div className="flex flex-wrap gap-2">
+                      {CHAKRA_NATURES.map((nature) => (
+                        <button
+                          type="button"
+                          key={nature}
+                          onClick={() => handleNatureToggle(nature)}
+                          className={`px-4 py-2 rounded transition ${
+                            selectedNatures.includes(nature)
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          {nature}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleGenerate}
+                  className="mt-4 w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-semibold"
                 >
-                  <option value="None">None</option>
-                  {NINJA_CLANS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  Generate Character
+                </button>
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Rank</label>
-                <select
-                  value={rank}
-                  onChange={(e) => setRank(e.target.value as NinjaRank)}
-                  className="w-full p-2 border rounded"
-                >
-                  {NINJA_RANKS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Specialty</label>
-                <select
-                  value={specialty}
-                  onChange={(e) => setSpecialty(e.target.value as NinjaSpecialty)}
-                  className="w-full p-2 border rounded"
-                >
-                  {NINJA_SPECIALTIES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-2">Chakra Natures</label>
-                <div className="flex flex-wrap gap-2">
-                  {CHAKRA_NATURES.map((nature) => (
+            {/* Character Tabs */}
+            {characters.length > 0 && (
+              <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div className="flex items-center gap-2 p-2 bg-gray-100 overflow-x-auto">
+                  <Users className="w-5 h-5 text-gray-600 flex-shrink-0" />
+                  {characters.map((char) => (
                     <button
                       type="button"
-                      key={nature}
-                      onClick={() => handleNatureToggle(nature)}
-                      className={`px-4 py-2 rounded transition ${
-                        selectedNatures.includes(nature)
+                      key={char.id}
+                      onClick={() => setActiveTab(char.id)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded transition flex-shrink-0 ${
+                        activeTab === char.id
                           ? 'bg-orange-500 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          : 'bg-white text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      {nature}
+                      {char.name}
+                      <X
+                        className="w-4 h-4 hover:text-red-500"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(char.id);
+                        }}
+                      />
                     </button>
                   ))}
                 </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleGenerate}
-              className="mt-4 w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-semibold"
-            >
-              Generate Character
-            </button>
-          </div>
-        )}
-
-        {/* Character Tabs */}
-        {characters.length > 0 && (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div className="flex items-center gap-2 p-2 bg-gray-100 overflow-x-auto">
-              <Users className="w-5 h-5 text-gray-600 flex-shrink-0" />
-              {characters.map((char) => (
-                <button
-                  type="button"
-                  key={char.id}
-                  onClick={() => setActiveTab(char.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded transition flex-shrink-0 ${
-                    activeTab === char.id ? 'bg-orange-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {char.name}
-                  <X
-                    className="w-4 h-4 hover:text-red-500"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(char.id);
-                    }}
-                  />
-                </button>
-              ))}
-            </div>
 
             {/* Character Display */}
             {activeCharacter && (
@@ -747,7 +895,13 @@ const NinjaGenerator: React.FC = () => {
                       Lvl +
                     </button>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <button
+                      onClick={() => openTurnOrderCharacterForm(activeCharacter.id)}
+                      className="px-3 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                    >
+                      {activeCharacterTurnOrderEntry ? 'Update Turn Order' : 'Add to Turn Order'}
+                    </button>
                     <button
                       onClick={() => handleExportForChar(activeCharacter.id)}
                       className="px-3 py-1 bg-blue-500 text-white rounded"
@@ -755,15 +909,46 @@ const NinjaGenerator: React.FC = () => {
                       Copy JSON
                     </button>
                     <button
-                      onClick={() =>
-                        setCharacters((prev) => prev.filter((c) => c.id !== activeCharacter.id))
-                      }
+                      onClick={() => handleDelete(activeCharacter.id)}
                       className="px-3 py-1 bg-red-500 text-white rounded"
                     >
                       Delete
                     </button>
                   </div>
                 </div>
+
+                {turnOrderCharacterId === activeCharacter.id && (
+                  <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-end">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium mb-2">Initiative Count</label>
+                        <input
+                          type="number"
+                          value={turnOrderInitiative}
+                          onChange={(event) => setTurnOrderInitiative(event.target.value)}
+                          className="w-full rounded border px-3 py-2"
+                          placeholder="Enter initiative"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={submitCharacterTurnOrder}
+                          className="rounded bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700"
+                        >
+                          Save Turn Order
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetTurnOrderCharacterForm}
+                          className="rounded bg-white px-4 py-2 font-medium text-gray-700 hover:bg-gray-100"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 lg:grid-cols-2 gap-6">
                   {/* Left: basic info, trackers, stats */}
@@ -1128,12 +1313,34 @@ const NinjaGenerator: React.FC = () => {
           </div>
         )}
 
-        {characters.length === 0 && !showGenerator && (
-          <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <p className="text-xl text-gray-600">No characters yet. Generate your first ninja!</p>
+            {characters.length === 0 && !showGenerator && (
+              <div className="bg-white rounded-lg shadow-lg p-12 text-center">
+                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-xl text-gray-600">
+                  No characters yet. Generate your first ninja!
+                </p>
+              </div>
+            )}
           </div>
-        )}
+
+          <TurnOrderSidebar
+            characters={characters.map((character) => ({
+              id: character.id,
+              name: character.name,
+              hp: character.hp,
+              maxHp: character.maxHp,
+              chakra: character.chakra,
+              maxChakra: character.maxChakra,
+            }))}
+            entries={turnOrderEntries}
+            isCollapsed={isTurnOrderCollapsed}
+            onAddPlayerTurn={addPlayerTurn}
+            onAddPlayerToEnd={addPlayerToEnd}
+            onRemoveEntry={removeTurnOrderEntry}
+            onToggleCollapse={() => setIsTurnOrderCollapsed((current) => !current)}
+            onUpdateEntryNote={updateTurnOrderEntryNote}
+          />
+        </div>
       </div>
     </div>
   );
