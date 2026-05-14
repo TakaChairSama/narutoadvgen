@@ -290,8 +290,7 @@ function App() {
     setCurrentChakra(currentChakra + chakraIncrease); // Increase current Chakra by the same amount
   };
 
-  const generateId = () =>
-    Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const generateId = () => crypto.randomUUID();
 
   const insertByInitiative = (
     prev: TurnOrderEntry[],
@@ -359,7 +358,7 @@ function App() {
   };
 
   return (
-    <div className={`min-h-screen bg-gray-100 transition-all duration-300 ${turnOrderOpen ? 'pr-80' : ''}`}>
+    <div className={`min-h-screen bg-gray-100 overflow-x-hidden transition-all duration-300 ${turnOrderOpen ? 'sm:pr-80' : ''}`}>
       <header className="bg-red-700 text-white py-6 shadow-lg">
         <div className="container mx-auto px-4">
           <div className="flex items-center space-x-4">

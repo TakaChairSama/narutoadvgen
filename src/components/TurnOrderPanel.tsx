@@ -37,7 +37,9 @@ export function TurnOrderPanel({
 
   const handleAddPlayer = () => {
     if (!newName.trim() || newInitiative === '') return;
-    onAddPlayer(newName.trim(), Number(newInitiative));
+    const parsed = Number(newInitiative);
+    if (!Number.isFinite(parsed)) return;
+    onAddPlayer(newName.trim(), parsed);
     setNewName('');
     setNewInitiative('');
     setAddMode(null);
