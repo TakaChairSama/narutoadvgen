@@ -28,43 +28,19 @@ import {
   getChakraWeaponByName,
   searchChakraWeapons,
 } from '../data/chakraWeapons';
+import {
+  ABILITY_STATS,
+  createDefaultSkills,
+  DEFAULT_TECHNIQUE_SCALING,
+  SKILL_DEFINITIONS,
+} from '../utils/characterData';
 
 // helpers
 const rollDice = (sides: number) => Math.floor(Math.random() * sides) + 1;
 const calculateModifier = (score: number) => Math.floor((score - 10) / 2);
 const levelFromCR = (cr: number) => Math.floor((cr + 1) / 2);
 const resolveClanFile = (clan: string) => String(clan).toLowerCase().replace(/\s+/g, '');
-const ABILITY_STATS: AbilityStat[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
-const SKILL_DEFINITIONS: Array<{ name: string; stat: AbilityStat }> = [
-  { name: 'Acrobatics', stat: 'dex' },
-  { name: 'Animal Handling', stat: 'wis' },
-  { name: 'Athletics', stat: 'str' },
-  { name: 'Chakra Control', stat: 'con' },
-  { name: 'Crafting', stat: 'int' },
-  { name: 'Deception', stat: 'cha' },
-  { name: 'Illusions', stat: 'wis' },
-  { name: 'Insight', stat: 'wis' },
-  { name: 'History', stat: 'int' },
-  { name: 'Intimidation', stat: 'cha' },
-  { name: 'Investigation', stat: 'int' },
-  { name: 'Medicine', stat: 'wis' },
-  { name: 'Nature', stat: 'int' },
-  { name: 'Ninshou', stat: 'int' },
-  { name: 'Perception', stat: 'wis' },
-  { name: 'Performance', stat: 'cha' },
-  { name: 'Persuasion', stat: 'cha' },
-  { name: 'Sleight of Hand', stat: 'dex' },
-  { name: 'Stealth', stat: 'dex' },
-  { name: 'Survival', stat: 'wis' },
-  { name: 'Martial Arts', stat: 'str' },
-];
-const DEFAULT_TECHNIQUE_SCALING: TechniqueScaling = {
-  ninjutsu: 'int',
-  taijutsu: 'str',
-  genjutsu: 'wis',
-};
-
-const getProficiencyBonus = (level: number) => Math.floor((Math.max(1, level) - 1) / 4) + 2;
+const getProficiencyBonus = (cr: number) => Math.floor((Math.max(1, cr) - 1) / 4) + 2;
 
 const rankFromCR = (cr: number): NinjaRank => {
   if (cr <= 4) return 'Genin';
@@ -82,14 +58,6 @@ const specialtyStatKey = (spec: NinjaSpecialty): AbilityStat => {
   if (spec === 'Fuinjutsu') return 'int';
   return 'int';
 };
-
-const createDefaultSkills = (): CharacterSkill[] =>
-  SKILL_DEFINITIONS.map((skill) => ({
-    ...skill,
-    proficient: false,
-    expertise: false,
-    advantage: false,
-  }));
 
 const normalizeTechniqueScaling = (rawScaling: unknown): TechniqueScaling => {
   const source = rawScaling && typeof rawScaling === 'object' ? (rawScaling as Record<string, unknown>) : {};
@@ -891,14 +859,14 @@ const NinjaGenerator: React.FC = () => {
               return {
                 ...skill,
                 proficient: value,
-                expertise: value ? skill.expertise : false,
+                expertise: value && skill.expertise,
               };
             }
             if (field === 'expertise') {
               return {
                 ...skill,
                 expertise: value,
-                proficient: value ? true : skill.proficient,
+                proficient: value || skill.proficient,
               };
             }
             return { ...skill, advantage: value };
