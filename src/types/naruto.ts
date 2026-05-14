@@ -137,6 +137,15 @@ export interface NinjaCharacter {
   clanFeatures?: string[];
 }
 
+export interface TurnOrderEntry {
+  id: string;
+  name: string;
+  initiative: number;
+  note: string;
+  isCharacter: boolean;
+  addedToEnd: boolean;
+}
+
 export interface ClanFeature {
   name: string;
   description: string;

@@ -28,7 +28,9 @@ import type {
   NinjaRank,
   NinjaSpecialty,
   Jutsu,
+  TurnOrderEntry,
 } from './types/naruto';
+import { TurnOrderPanel } from './components/TurnOrderPanel';
 
 interface JutsuDetailsProps {
   jutsu: Jutsu;
@@ -105,6 +107,12 @@ function App() {
 
   const [exportedCharacter, setExportedCharacter] = useState<string>('');
   const [importedCharacter, setImportedCharacter] = useState<string>('');
+
+  // Turn order state
+  const [turnOrder, setTurnOrder] = useState<TurnOrderEntry[]>([]);
+  const [turnOrderOpen, setTurnOrderOpen] = useState<boolean>(false);
+  const [showInitiativeInput, setShowInitiativeInput] = useState<boolean>(false);
+  const [characterInitiative, setCharacterInitiative] = useState<string>('');
 
   const handleNatureToggle = (nature: ChakraNature) => {
     if (selectedNatures.includes(nature)) {
@@ -282,8 +290,75 @@ function App() {
     setCurrentChakra(currentChakra + chakraIncrease); // Increase current Chakra by the same amount
   };
 
+  const generateId = () => crypto.randomUUID();
+
+  const insertByInitiative = (
+    prev: TurnOrderEntry[],
+    entry: TurnOrderEntry
+  ): TurnOrderEntry[] => {
+    const fixed = prev.filter((e) => !e.addedToEnd);
+    const tail = prev.filter((e) => e.addedToEnd);
+    const idx = fixed.findIndex((e) => e.initiative < entry.initiative);
+    const updated =
+      idx === -1
+        ? [...fixed, entry]
+        : [...fixed.slice(0, idx), entry, ...fixed.slice(idx)];
+    return [...updated, ...tail];
+  };
+
+  const handleAddCharacterToTurnOrder = () => {
+    if (!character || characterInitiative === '') return;
+    const initiative = Number(characterInitiative);
+    const entry: TurnOrderEntry = {
+      id: generateId(),
+      name: characterName || character.name,
+      initiative,
+      note: '',
+      isCharacter: true,
+      addedToEnd: false,
+    };
+    setTurnOrder((prev) => insertByInitiative(prev, entry));
+    setShowInitiativeInput(false);
+    setCharacterInitiative('');
+    setTurnOrderOpen(true);
+  };
+
+  const handleAddPlayerToTurnOrder = (name: string, initiative: number) => {
+    const entry: TurnOrderEntry = {
+      id: generateId(),
+      name,
+      initiative,
+      note: '',
+      isCharacter: false,
+      addedToEnd: false,
+    };
+    setTurnOrder((prev) => insertByInitiative(prev, entry));
+  };
+
+  const handleAddToEnd = (name: string) => {
+    const entry: TurnOrderEntry = {
+      id: generateId(),
+      name,
+      initiative: 0,
+      note: '',
+      isCharacter: false,
+      addedToEnd: true,
+    };
+    setTurnOrder((prev) => [...prev, entry]);
+  };
+
+  const handleRemoveFromTurnOrder = (id: string) => {
+    setTurnOrder((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const handleUpdateNote = (id: string, note: string) => {
+    setTurnOrder((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, note } : e))
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className={`min-h-screen bg-gray-100 overflow-x-hidden transition-all duration-300 ${turnOrderOpen ? 'sm:pr-80' : ''}`}>
       <header className="bg-red-700 text-white py-6 shadow-lg">
         <div className="container mx-auto px-4">
           <div className="flex items-center space-x-4">
@@ -420,10 +495,53 @@ function App() {
 
               <button
                 onClick={handleLevelUp}
-                className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+                className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 mb-2"
               >
                 Level Up
               </button>
+
+              {/* Add to Turn Order */}
+              {!showInitiativeInput ? (
+                <button
+                  onClick={() => setShowInitiativeInput(true)}
+                  className="w-full bg-orange-600 text-white py-2 px-4 rounded-md hover:bg-orange-700 mb-2"
+                >
+                  Add to Turn Order
+                </button>
+              ) : (
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="number"
+                    value={characterInitiative}
+                    onChange={(e) => setCharacterInitiative(e.target.value)}
+                    placeholder="Initiative count"
+                    className="flex-1 border rounded px-2 py-1 text-sm"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddCharacterToTurnOrder();
+                      if (e.key === 'Escape') {
+                        setShowInitiativeInput(false);
+                        setCharacterInitiative('');
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={handleAddCharacterToTurnOrder}
+                    className="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowInitiativeInput(false);
+                      setCharacterInitiative('');
+                    }}
+                    className="bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
 
               <div className="space-y-4">
                 <div className="border-b pb-4">
@@ -613,6 +731,21 @@ function App() {
           </div>
         </div>
       </main>
+
+      <TurnOrderPanel
+        isOpen={turnOrderOpen}
+        onToggle={() => setTurnOrderOpen((v) => !v)}
+        turnOrder={turnOrder}
+        onRemove={handleRemoveFromTurnOrder}
+        onUpdateNote={handleUpdateNote}
+        onAddPlayer={handleAddPlayerToTurnOrder}
+        onAddToEnd={handleAddToEnd}
+        currentHp={currentHp}
+        maxHp={character?.maxHp ?? 0}
+        currentChakra={currentChakra}
+        maxChakra={character?.maxChakra ?? 0}
+        hasCharacter={character !== null}
+      />
     </div>
   );
 }
