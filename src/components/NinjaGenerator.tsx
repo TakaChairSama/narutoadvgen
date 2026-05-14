@@ -498,7 +498,7 @@ const NinjaGenerator: React.FC = () => {
     );
   };
 
-  const useChakraCost = (id: string, chakraCost: number) => {
+  const applyChakraCost = (id: string, chakraCost: number) => {
     if (!Number.isFinite(chakraCost) || chakraCost <= 0) return;
     setCharacters((prev) =>
       prev.map((c) => (c.id === id ? { ...c, chakra: Math.max(0, c.chakra - chakraCost) } : c))
@@ -1455,7 +1455,7 @@ const NinjaGenerator: React.FC = () => {
                               </div>
                               <button
                                 type="button"
-                                onClick={() => useChakraCost(activeCharacter.id, jutsu.chakraCost)}
+                                onClick={() => applyChakraCost(activeCharacter.id, jutsu.chakraCost)}
                                 className="mt-3 px-3 py-1 text-xs font-medium rounded bg-purple-600 text-white hover:bg-purple-700"
                               >
                                 Use
@@ -1508,7 +1508,7 @@ const NinjaGenerator: React.FC = () => {
                                 )}
                                 <button
                                   type="button"
-                                  onClick={() => useChakraCost(activeCharacter.id, cj.chakraCost)}
+                                  onClick={() => applyChakraCost(activeCharacter.id, cj.chakraCost)}
                                   className="mt-3 px-3 py-1 text-xs font-medium rounded bg-pink-600 text-white hover:bg-pink-700"
                                 >
                                   Use
