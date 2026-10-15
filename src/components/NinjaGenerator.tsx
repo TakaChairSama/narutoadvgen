@@ -1,6 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Scroll, Users, Upload, X, Plus } from 'lucide-react';
 import TurnOrderSidebar, { type TurnOrderEntry } from './TurnOrderSidebar';
+import JutsuBrowser from './JutsuBrowser';
+import BuildEditor, { type BuildPatch } from './BuildEditor';
 import type {
   AbilityStat,
   ChakraNature,
@@ -451,6 +453,158 @@ const NinjaGenerator: React.FC = () => {
     setCharacters((prev) => [...prev, newChar]);
     setActiveTab(newChar.id);
     setCustomName('');
+  };
+
+
+  // Start an empty NPC at the chosen rank so everything can be picked by hand
+  const handleCreateBlank = async () => {
+    const [minCR] = ({
+      Genin: [1, 4],
+      Chunin: [5, 8],
+      Jonin: [9, 12],
+      ANBU: [13, 16],
+      Kage: [17, 20],
+    } as Record<NinjaRank, [number, number]>)[rank];
+    const cr = minCR;
+    const lvl = levelFromCR(cr);
+    const stats: Record<string, number> = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+    const modifiers = Object.fromEntries(
+      Object.entries(stats).map(([k, v]) => [k, calculateModifier(v)])
+    ) as Record<string, number>;
+    const proficiencyBonus = getProficiencyBonus(cr);
+    const techniqueScaling = { ...DEFAULT_TECHNIQUE_SCALING };
+    const { attackMods, saveDCs } = calculateTechniqueValues(
+      modifiers,
+      proficiencyBonus,
+      techniqueScaling
+    );
+    const maxHp = Math.floor(cr * 6.5) + 10;
+    const features = (await loadClanFeatures(clan)).filter((f) => (f?.level ?? 0) <= lvl);
+
+    const newChar: NinjaCharacter = {
+      id: generateId(),
+      name: customName || `${clan} ${rank}`,
+      clan,
+      rank,
+      cr,
+      xp: XP_BY_CR[cr] ?? 0,
+      chakraNatures: selectedNatures,
+      specialty,
+      stats,
+      modifiers,
+      hp: maxHp,
+      maxHp,
+      chakra: maxHp,
+      maxChakra: maxHp,
+      ac: 11 + (modifiers.dex ?? 0) + Math.floor(0.5 * cr) + 3,
+      speed: 30,
+      jutsu: [],
+      clanFeatures: features,
+      clanJutsu: [],
+      weapons: [],
+      abilities: clan && clan !== 'None' ? getClanFeatures(clan as NinjaClan, lvl) : [],
+      proficiencyBonus,
+      attackMods,
+      saveDCs,
+      skills: createDefaultSkills(),
+      techniqueScaling,
+      baseStats: { ...stats },
+      baseCR: cr,
+      chakraWeapons: [],
+    };
+
+    setCharacters((prev) => [...prev, newChar]);
+    setActiveTab(newChar.id);
+    setCustomName('');
+  };
+
+  // Apply edits from the Edit Build panel and recompute everything derived from them
+  const updateBuild = async (id: string, patch: BuildPatch) => {
+    setCharacters((prev) =>
+      prev.map((c) => {
+        if (c.id !== id) return c;
+        const next: NinjaCharacter = { ...c };
+        if (patch.name !== undefined) next.name = patch.name;
+        if (patch.specialty !== undefined) next.specialty = patch.specialty;
+        if (patch.chakraNatures !== undefined) next.chakraNatures = patch.chakraNatures;
+        if (patch.speed !== undefined) next.speed = patch.speed;
+        if (patch.ac !== undefined) next.ac = patch.ac;
+        if (patch.maxHp !== undefined) {
+          next.hp = c.hp === c.maxHp ? patch.maxHp : c.hp;
+          next.maxHp = patch.maxHp;
+        }
+        if (patch.maxChakra !== undefined) {
+          next.chakra = c.chakra === c.maxChakra ? patch.maxChakra : c.chakra;
+          next.maxChakra = patch.maxChakra;
+        }
+        if (patch.stats !== undefined) {
+          next.stats = patch.stats;
+          next.baseStats = { ...patch.stats };
+          next.baseCR = c.cr;
+          next.modifiers = Object.fromEntries(
+            Object.entries(patch.stats).map(([k, v]) => [k, calculateModifier(Math.floor(v))])
+          ) as Record<string, number>;
+          const { attackMods, saveDCs } = calculateTechniqueValues(
+            next.modifiers,
+            c.proficiencyBonus,
+            c.techniqueScaling
+          );
+          next.attackMods = attackMods;
+          next.saveDCs = saveDCs;
+          if (patch.ac === undefined) {
+            next.ac = 11 + (next.modifiers.dex ?? 0) + Math.floor(0.5 * c.cr) + 3;
+          }
+        }
+        if (patch.clan !== undefined && patch.clan !== c.clan) {
+          next.clan = patch.clan;
+          // Clan jutsu from the old clan no longer apply
+          next.jutsu = c.jutsu.filter((j) => !c.clanJutsu.some((cj) => cj.name === j.name));
+          next.clanJutsu = [];
+          next.clanFeatures = [];
+          next.abilities =
+            patch.clan !== 'None'
+              ? getClanFeatures(patch.clan as NinjaClan, levelFromCR(c.cr))
+              : [];
+        }
+        return next;
+      })
+    );
+
+    if (patch.clan !== undefined) {
+      const features = (await loadClanFeatures(patch.clan)).filter(
+        (f) => (f?.level ?? 0) <= levelFromCR(characters.find((c) => c.id === id)?.cr ?? 1)
+      );
+      setCharacters((prev) =>
+        prev.map((c) => (c.id === id && c.clan === patch.clan ? { ...c, clanFeatures: features } : c))
+      );
+    }
+  };
+
+  const addJutsuToCharacter = (id: string, jutsu: JutsuType) => {
+    setCharacters((prev) =>
+      prev.map((c) => {
+        if (c.id !== id || c.jutsu.some((j) => j.name === jutsu.name)) return c;
+        return {
+          ...c,
+          jutsu: [...c.jutsu, jutsu],
+          clanJutsu: jutsu.clan ? [...c.clanJutsu, jutsu] : c.clanJutsu,
+        };
+      })
+    );
+  };
+
+  const removeJutsuFromCharacter = (id: string, name: string) => {
+    setCharacters((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              jutsu: c.jutsu.filter((j) => j.name !== name),
+              clanJutsu: c.clanJutsu.filter((j) => j.name !== name),
+            }
+          : c
+      )
+    );
   };
 
   const handleDelete = (id: string) => {
@@ -1027,7 +1181,14 @@ const NinjaGenerator: React.FC = () => {
                 onClick={handleGenerate}
                 className="mt-4 w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-semibold"
               >
-                Generate Character
+                Generate Random Character
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateBlank}
+                className="mt-2 w-full py-2 bg-white border-2 border-orange-600 text-orange-700 rounded-lg hover:bg-orange-50 transition font-semibold"
+              >
+                Start Blank NPC (pick everything yourself)
               </button>
             </div>
 
@@ -1421,6 +1582,30 @@ const NinjaGenerator: React.FC = () => {
 
                   {/* Right: jutsu, clan features, weapons, chakra weapons */}
                   <div className="space-y-4">
+                    <BuildEditor
+                      key={activeCharacter.id}
+                      value={{
+                        name: activeCharacter.name,
+                        clan: activeCharacter.clan,
+                        specialty: activeCharacter.specialty,
+                        chakraNatures: activeCharacter.chakraNatures,
+                        stats: activeCharacter.stats,
+                        maxHp: activeCharacter.maxHp,
+                        maxChakra: activeCharacter.maxChakra,
+                        ac: activeCharacter.ac,
+                        speed: activeCharacter.speed,
+                      }}
+                      onChange={(patch) => updateBuild(activeCharacter.id, patch)}
+                    />
+                    <JutsuBrowser
+                      rank={activeCharacter.rank}
+                      specialty={activeCharacter.specialty}
+                      natures={activeCharacter.chakraNatures}
+                      clan={activeCharacter.clan}
+                      known={activeCharacter.jutsu}
+                      onAdd={(j) => addJutsuToCharacter(activeCharacter.id, j)}
+                      onRemove={(name) => removeJutsuFromCharacter(activeCharacter.id, name)}
+                    />
                     {/* Jutsu */}
                     <div className="bg-purple-50 p-4 rounded-lg">
                       <h4 className="font-bold mb-2">Jutsu</h4>
@@ -1459,6 +1644,13 @@ const NinjaGenerator: React.FC = () => {
                                 className="mt-3 px-3 py-1 text-xs font-medium rounded bg-purple-600 text-white hover:bg-purple-700"
                               >
                                 Use
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeJutsuFromCharacter(activeCharacter.id, jutsu.name)}
+                                className="mt-3 ml-2 px-3 py-1 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-red-100"
+                              >
+                                Remove
                               </button>
                             </div>
                           </details>
