@@ -238,6 +238,23 @@ const NinjaGenerator: React.FC = () => {
   // Import character JSON UI
   const [importText, setImportText] = useState('');
   const [showImportArea, setShowImportArea] = useState(false);
+  const [editMode, setEditMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('npc-edit-mode') !== 'off';
+    } catch {
+      return true;
+    }
+  });
+  const toggleEditMode = () =>
+    setEditMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('npc-edit-mode', next ? 'on' : 'off');
+      } catch {
+        // storage unavailable; toggle still works for this session
+      }
+      return next;
+    });
 
   // Export cache per character
   const [exportedJsonById, setExportedJsonById] = useState<Record<string, string>>({});
@@ -1246,6 +1263,27 @@ const NinjaGenerator: React.FC = () => {
                   </div>
                   <div className="flex flex-wrap gap-2 justify-end">
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={editMode}
+                      onClick={toggleEditMode}
+                      className="flex items-center gap-2 px-3 py-1 rounded bg-white border hover:bg-gray-50"
+                      title="Show or hide the Edit Build panel and Jutsu Library"
+                    >
+                      <span
+                        className={`relative inline-block w-9 h-5 rounded-full transition ${
+                          editMode ? 'bg-orange-500' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${
+                            editMode ? 'left-[18px]' : 'left-0.5'
+                          }`}
+                        />
+                      </span>
+                      Edit mode
+                    </button>
+                    <button
                       onClick={() => openTurnOrderCharacterForm(activeCharacter.id)}
                       className="px-3 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
                     >
@@ -1582,6 +1620,8 @@ const NinjaGenerator: React.FC = () => {
 
                   {/* Right: jutsu, clan features, weapons, chakra weapons */}
                   <div className="space-y-4">
+                    {editMode && (
+                    <>
                     <BuildEditor
                       key={activeCharacter.id}
                       value={{
@@ -1606,6 +1646,8 @@ const NinjaGenerator: React.FC = () => {
                       onAdd={(j) => addJutsuToCharacter(activeCharacter.id, j)}
                       onRemove={(name) => removeJutsuFromCharacter(activeCharacter.id, name)}
                     />
+                    </>
+                    )}
                     {/* Jutsu */}
                     <div className="bg-purple-50 p-4 rounded-lg">
                       <h4 className="font-bold mb-2">Jutsu</h4>
@@ -1645,13 +1687,17 @@ const NinjaGenerator: React.FC = () => {
                               >
                                 Use
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => removeJutsuFromCharacter(activeCharacter.id, jutsu.name)}
-                                className="mt-3 ml-2 px-3 py-1 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-red-100"
-                              >
-                                Remove
-                              </button>
+                              {editMode && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeJutsuFromCharacter(activeCharacter.id, jutsu.name)
+                                  }
+                                  className="mt-3 ml-2 px-3 py-1 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-red-100"
+                                >
+                                  Remove
+                                </button>
+                              )}
                             </div>
                           </details>
                         ))}
